@@ -68,7 +68,6 @@ def _gensim_assign(corpus, bows, lda, theta_attr, z_attr):
             doc.metadata[z_attr] = phi.argmax(axis=0)[w].tolist()
 
 
-
 def cross_reference(corpus, theta_attr, xref_attr, n=sys.maxsize, threshold=1):
     """Finds the nearest documents by topic similarity.
 
