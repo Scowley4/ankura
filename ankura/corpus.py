@@ -183,3 +183,68 @@ def amazon():
     )
     p.tokenizer = pipeline.frequency_tokenizer(p, 50)
     return p.run(_path('amazon.pickle'))
+
+
+def tripadvisor():
+    """Gets a Corpus containing roughly 240,000 TripAdvisor hotel reviews, with
+    ratings for various aspects of the hotel.
+    """
+    labeler = {}
+
+    def _extractor(docfile):
+        hotel_id = docfile.name[6:-4]
+        reviews = docfile.read().decode('utf-8').split('\r\n\r\n')[1:]
+        for i, review in enumerate(reviews):
+            review = review.split('\r\n')
+            if len(review) != 13:
+                continue
+            review_id = '{}_{}'.format(hotel_id, i)
+            labeler[review_id] = dict(line[1:].split('>') for line in review[5:])
+            yield pipeline.Text(review_id, review[1][9:])
+
+    p = pipeline.Pipeline(
+        download_inputer('tripadvisor/tripadvisor.tar.gz'),
+        pipeline.targz_extractor(_extractor),
+        pipeline.stopword_tokenizer(
+            pipeline.default_tokenizer(),
+            open_download('stopwords/english.txt'),
+        ),
+        pipeline.composite_labeler(
+            pipeline.title_labeler('Id'),
+            labeler.pop,
+        ),
+        pipeline.length_filterer(),
+    )
+    p.tokenizer = pipeline.frequency_tokenizer(p, 200)
+    return p.run(_path('tripadvisor.pickle'))
+
+
+def yelp():
+    """Gets a Corpus containing roughly 25,000 restaurant reviews, along with
+    ratings.
+    """
+    p = pipeline.Pipeline(
+        download_inputer('yelp/yelp.txt'),
+        pipeline.line_extractor('\t'),
+        pipeline.stopword_tokenizer(
+            pipeline.default_tokenizer(),
+            open_download('stopwords/english.txt'),
+        ),
+        pipeline.composite_labeler(
+            pipeline.title_labeler('id'),
+            pipeline.float_labeler(
+                open_download('yelp/yelp.response'),
+                'rating',
+            ),
+            pipeline.transform_labeler(
+                pipeline.float_labeler(
+                    open_download('yelp/yelp.response'),
+                    'binary_rating',
+                ),
+                lambda r: r >= 5,
+            ),
+        ),
+        pipeline.length_filterer(),
+    )
+    p.tokenizer = pipeline.frequency_tokenizer(p, 50)
+    return p.run(_path('yelp.pickle'))
