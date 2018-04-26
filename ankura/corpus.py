@@ -143,7 +143,10 @@ def newsgroups():
         pipeline.composite_labeler(
             pipeline.title_labeler('id'),
             pipeline.dir_labeler('newsgroup'),
-            lambda n: {'coarse_newsgroup': coarse_mapping[os.path.dirname(n)]},
+            pipeline.transform_labeler(
+                pipeline.dir_labeler('coarse_newsgroup'),
+                coarse_mapping.get,
+            ),
         ),
         pipeline.length_filterer(),
     )
@@ -167,6 +170,13 @@ def amazon():
             pipeline.float_labeler(
                 open_download('amazon/amazon.stars'),
                 'rating',
+            ),
+            pipeline.transform_labeler(
+                pipeline.float_labeler(
+                    open_download('amazon/amazon.stars'),
+                    'binary_rating',
+                ),
+                lambda r: r >= 5,
             ),
         ),
         pipeline.length_filterer(),

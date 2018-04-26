@@ -381,6 +381,20 @@ def list_labeler(data, attr='label', delim='\t', sep=','):
     return stream_labeler(stream, attr)
 
 
+def transform_labeler(base_labeler, transform_fn):
+    """Returns a labeler which transforms the labels of another labeler. The
+    transform_fn should be a function which takes in a value (not the key)
+    output by another labeler and returns the transformed value.
+    """
+    @functools.wraps(transform_labeler)
+    def _labeler(name):
+        labels = base_labeler(name)
+        for key, value in labels.items():
+            labels[key] = transform_fn(value)
+        return labels
+    return _labeler
+
+
 def composite_labeler(*labelers):
     """Returns a labeling with the merged results of several labelers"""
     @functools.wraps(composite_labeler)
