@@ -1,47 +1,11 @@
 import csv
+import itertools
+import pickle
 import numpy as np
 
+import gensim as gs
+
 import ankura
-# def canned_gs_lda(K):
-    # @ankura.util.pickle_cache('topics.pickle')
-    # def get_gs_lda():
-        # ret = gs_lda(K)
-        # pickle.dump(corpus, open('corpus.pickle', 'wb'))
-        # return ret
-    # return get_gs_lda()
-
-
-# def gs_lda(K):
-    # attr = 'GS{}+LDA'.format(K)
-    # anchors = ankura.anchor.gram_schmidt_anchors(corpus, Q, K)
-    # topics = ankura.anchor.recover_topics(Q, anchors)
-    # ankura.topic.lda_assign(corpus, topics, theta_attr=theta(attr), z_attr=z(attr))
-    # return attr, topics
-
-
-# def lda(K):
-    # attr = 'LDA{}'.format(K)
-    # topics = ankura.other.gensim_lda(corpus, K, theta_attr=theta(attr), z_attr=z(attr))
-    # return attr, topics
-
-
-# def ta_lda(K):
-    # attr = 'TA{}+LDA'.format(K)
-    # seeds = np.random.choice(len(corpus.documents), size=K, replace=False)
-    # indices = [[t.token for t in corpus.documents[d].tokens] for d in seeds]
-    # anchors = ankura.anchor.tandem_anchors(indices, Q)
-    # topics = ankura.anchor.recover_topics(Q, anchors)
-    # ankura.topic.lda_assign(corpus, topics, theta_attr=theta(attr), z_attr=z(attr))
-    # return attr, topics
-
-
-# def stats(attr, topics):
-    # print(attr)
-    # print('Switch %:\t', ankura.validate.topic_switch_percent(corpus, z(attr)))
-    # print('Switch VI:\t', ankura.validate.topic_switch_vi(corpus, z(attr)))
-    # print('Topic JS:\t', ankura.validate.topic_word_divergence(corpus, topics, z(attr)))
-    # print('Windo Prob:\t', ankura.validate.window_prob(corpus, topics, z(attr)))
-    # print('Coherence:\t', ankura.validate.coherence(corpus, ankura.topic.topic_summary(topics)))
 
 
 def z(attr):
@@ -55,7 +19,7 @@ def theta(attr):
 def dump_csv(attr, corpus, topics, n=1000, window_size=10):
     summary = ankura.topic.topic_summary(topics, corpus, n=11)
     highlighter = lambda w, _: '<u>{}</u>'.format(w)
-    f = open('{}.csv'.format(attr), 'w')
+    f = open('scripts/{}.csv'.format(attr), 'w')
 
     fields = ['text']
     fields.extend('label-{}'.format(i) for i in [1, 2, 3, 4, 5])
@@ -117,10 +81,72 @@ def dump_csv(attr, corpus, topics, n=1000, window_size=10):
     f.close()
 
 
-# for model in [gs_lda, ta_lda, lda]:
-    # for k in [20, 100, 200]:
-# for model in [canned_gs_lda]:
-    # for k in [250]:
-        # attr, topics = model(k)
-        # # stats(attr, topics)
-        # dump_csv(attr, topics)
+def dump_lda(corpus, K):
+    attr = '{}_lda_{}'.format(corpus.metadata['name'], K)
+
+    bows = ankura.topic._gensim_bows(corpus)
+    lda = gs.models.LdaModel(
+        corpus=bows,
+        num_topics=K,
+    )
+    ankura.topic._gensim_assign(corpus, bows, lda, theta(attr), z(attr))
+    topics = lda.get_topics().T
+
+    dump_csv(attr, corpus, topics)
+
+
+def dump_gs(corpus, K):
+    attr = '{}_gs_{}'.format(corpus.metadata['name'], K)
+    corpus.metadata[attr] = attr
+
+
+importers = [
+    ankura.corpus.newsgroups,
+    ankura.corpus.yelp,
+    # ankura.corpus.amazon,
+    # ankura.corpus.tripadvisor,
+]
+dumps = [
+    dump_lda,
+    dump_gs,
+]
+Ks = [20, 200]
+
+for importer in importers:
+    corpus = importer()
+    for dump, K in itertools.product(dumps, Ks):
+        dump(corpus, K)
+    pickle.dump(corpus, open('scripts/{}.pickle'.format(corpus.metadata['name']), 'wb'))
+
+
+# # def canned_gs_lda(K):
+    # # @ankura.util.pickle_cache('topics.pickle')
+    # # def get_gs_lda():
+        # # ret = gs_lda(K)
+        # # pickle.dump(corpus, open('corpus.pickle', 'wb'))
+        # # return ret
+    # # return get_gs_lda()
+
+
+# # def gs_lda(K):
+    # # attr = 'GS{}+LDA'.format(K)
+    # # anchors = ankura.anchor.gram_schmidt_anchors(corpus, Q, K)
+    # # topics = ankura.anchor.recover_topics(Q, anchors)
+    # # ankura.topic.lda_assign(corpus, topics, theta_attr=theta(attr), z_attr=z(attr))
+    # # return attr, topics
+
+
+# # def lda(K):
+    # # attr = 'LDA{}'.format(K)
+    # # topics = ankura.other.gensim_lda(corpus, K, theta_attr=theta(attr), z_attr=z(attr))
+    # # return attr, topics
+
+
+# # def ta_lda(K):
+    # # attr = 'TA{}+LDA'.format(K)
+    # # seeds = np.random.choice(len(corpus.documents), size=K, replace=False)
+    # # indices = [[t.token for t in corpus.documents[d].tokens] for d in seeds]
+    # # anchors = ankura.anchor.tandem_anchors(indices, Q)
+    # # topics = ankura.anchor.recover_topics(Q, anchors)
+    # # ankura.topic.lda_assign(corpus, topics, theta_attr=theta(attr), z_attr=z(attr))
+    # # return attr, topics

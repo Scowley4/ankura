@@ -1,11 +1,10 @@
 __pycache__
 *.pickle
+
+*.csv
+
 .cache/
 .idea/
 .vscode/
-
 .coverage
 htmlcov
-scripts
-
-notes
