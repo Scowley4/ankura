@@ -1,0 +1,14 @@
+<div class="html-element-wrapper">{{text}}</div>
+<cml:radios class="randomize" label="Select the most appropriate topic for the underlined word:" validates="required" gold="true">
+  <cml:radio label="{{label-1}}" value="{{value-1}}" />
+  <cml:radio label="{{label-2}}" value="{{value-2}}" />
+  <cml:radio label="{{label-3}}" value="{{value-3}}" />
+  <cml:radio label="{{label-4}}" value="{{value-4}}" />
+  <cml:radio label="{{label-5}}" value="{{value-5}}" />
+</cml:radios>
+
+$$('.cml_field.randomize input').sort(function(a,b) {
+   return Math.round(Math.random()*10) - 1
+}).each(function(o) {
+   o.getParent('.cml_row').inject(o.getParent('.cml_field'))
+})

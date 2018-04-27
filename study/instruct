@@ -1,0 +1,53 @@
+<h1>Overview</h1>
+
+<p>In this task, we will analyze reviews of various consumer goods using topics. For our purpose, a topic is a general theme, concept or subject. We represent topics as groups of related words. For example, a topic concerning various headphones might be represented as:</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &lt;headphones, pair, sony, sound, comfortable, years, sennheiser, fit, wires, hours, koss&gt;</p>
+
+<p>A topic concerning price comparisons of different products might look like:</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &lt;money, time, buy, penny, cost, expensive, work, lot, extra, buying&gt;</p>
+
+<p>In this task, you will be shown short excerpts from reviews of various products and asked to select the most appropriate topic for an underlined target word.</p>
+<hr>
+
+<h1>Steps</h1>
+
+<p>1. Read the review excerpt, paying particular attention to how the underlined target word is used.</p>
+
+<p>2. Determine the topic of the underlined target word.</p>
+
+<p>3. Select the most appropriate topic from the given options.</p>
+<hr>
+
+<h1>Rules &amp; Tips</h1>
+
+<ul>
+	<li>While the dictionary definition of the target word may be useful, we are interested in the topic the target word is being used to discuss.</li>
+	<li>Try to select the most appropriate topic for the target word, NOT the entire review excerpt.</li>
+	<li>You may be given multiple topics which match the target word. Choose the best match for the target word.</li>
+	<li>In some cases there may be no topic which matches the target word, but you should still select one of the topics.</li>
+</ul>
+<hr>
+
+<h1>Examples</h1>
+
+<p>Select the topic which best matches the underlined word.</p>
+
+<p><img src="https://s3.amazonaws.com/crowdflower-make-cloud/images%2F1522948733520-voltage.png" style="width: 841px; height: 165.879px;" class="fr-fic fr-dib"></p>
+
+<p>Since the dictionary definition of the word "fast" is related to speed, both the first and second option may seem appealing. However, based on the context the word "fast" seems to relate more to the responsiveness of the device than velocity, so the second option is the most appropriate topic.</p>
+
+<p><img src="https://s3.amazonaws.com/crowdflower-make-cloud/images%2F1522947244641-fast.png" style="width: 841px; height: 169.599px;" class="fr-fic fr-dib"></p>
+
+<p>Overall this review is concerned with a GPS unit, so the fourth option about GPS units may seem appealing. However, in context the underlined target word is discussing the the intuitive and simple use of the unit, so the first option is better.</p>
+
+<p><img src="https://s3.amazonaws.com/crowdflower-make-cloud/images%2F1522947404038-easy.png" style="width: 841px; height: 178.231px;" class="fr-fic fr-dib"></p>
+
+<p>Sometimes multiple topics seem to match the target word. For example, here the target word seems to be about rechargeable AA batteries, and both the first and second topics capture that idea. Do your best and select the topic you think is the best match.</p>
+
+<p><img src="https://s3.amazonaws.com/crowdflower-make-cloud/images%2F1522947562260-aa.png" style="width: 825px; height: 175.313px;" class="fr-fic fr-dib"></p>
+
+<p>Occasionally you may be presented with no options that obviously fit the target word. You must still select a topic. Do your best and try to pick the topic which is the closest match, even if there isn't a good fit.&nbsp;</p>
+
+<p><img src="https://s3.amazonaws.com/crowdflower-make-cloud/images%2F1522947591702-cable.png" style="width: 841px; height: 164.871px;" class="fr-fic fr-dib"></p>
