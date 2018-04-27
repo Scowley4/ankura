@@ -95,58 +95,28 @@ def dump_lda(corpus, K):
     dump_csv(attr, corpus, topics)
 
 
-def dump_gs(corpus, K):
-    attr = '{}_gs_{}'.format(corpus.metadata['name'], K)
-    corpus.metadata[attr] = attr
+def dump_anchor(corpus, K):
+    attr = '{}_anchor_{}'.format(corpus.metadata['name'], K)
+    topics = ankura.anchor.anchor_algorithm(corpus, K)
+    ankura.topic.lda_assign(corpus, topics, theta(attr), z(attr))
+    dump_csv(attr, corpus, topics)
 
 
 importers = [
-    ankura.corpus.newsgroups,
     ankura.corpus.yelp,
-    # ankura.corpus.amazon,
-    # ankura.corpus.tripadvisor,
+    ankura.corpus.amazon,
+    ankura.corpus.tripadvisor,
 ]
 dumps = [
+    # dump_cluster
     dump_lda,
-    dump_gs,
+    dump_anchor,
+    # dump_copula
 ]
-Ks = [20, 200]
+Ks = [10, 20, 200]
 
 for importer in importers:
     corpus = importer()
     for dump, K in itertools.product(dumps, Ks):
         dump(corpus, K)
     pickle.dump(corpus, open('scripts/{}.pickle'.format(corpus.metadata['name']), 'wb'))
-
-
-# # def canned_gs_lda(K):
-    # # @ankura.util.pickle_cache('topics.pickle')
-    # # def get_gs_lda():
-        # # ret = gs_lda(K)
-        # # pickle.dump(corpus, open('corpus.pickle', 'wb'))
-        # # return ret
-    # # return get_gs_lda()
-
-
-# # def gs_lda(K):
-    # # attr = 'GS{}+LDA'.format(K)
-    # # anchors = ankura.anchor.gram_schmidt_anchors(corpus, Q, K)
-    # # topics = ankura.anchor.recover_topics(Q, anchors)
-    # # ankura.topic.lda_assign(corpus, topics, theta_attr=theta(attr), z_attr=z(attr))
-    # # return attr, topics
-
-
-# # def lda(K):
-    # # attr = 'LDA{}'.format(K)
-    # # topics = ankura.other.gensim_lda(corpus, K, theta_attr=theta(attr), z_attr=z(attr))
-    # # return attr, topics
-
-
-# # def ta_lda(K):
-    # # attr = 'TA{}+LDA'.format(K)
-    # # seeds = np.random.choice(len(corpus.documents), size=K, replace=False)
-    # # indices = [[t.token for t in corpus.documents[d].tokens] for d in seeds]
-    # # anchors = ankura.anchor.tandem_anchors(indices, Q)
-    # # topics = ankura.anchor.recover_topics(Q, anchors)
-    # # ankura.topic.lda_assign(corpus, topics, theta_attr=theta(attr), z_attr=z(attr))
-    # # return attr, topics
