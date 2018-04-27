@@ -95,6 +95,7 @@ def bible():
             ),
         ),
         pipeline.keep_filterer(),
+        pipeline.kwargs_informer(name='bible'),
     )
     p.tokenizer = pipeline.frequency_tokenizer(p, 2)
     return p.run(_path('bible.pickle'))
@@ -149,6 +150,7 @@ def newsgroups():
             ),
         ),
         pipeline.length_filterer(),
+        pipeline.kwargs_informer(name='newsgroups'),
     )
     p.tokenizer = pipeline.frequency_tokenizer(p, 100, 2000)
     return p.run(_path('newsgroups.pickle'))
@@ -180,6 +182,7 @@ def amazon():
             ),
         ),
         pipeline.length_filterer(),
+        pipeline.kwargs_informer(name='amazon'),
     )
     p.tokenizer = pipeline.frequency_tokenizer(p, 50)
     return p.run(_path('amazon.pickle'))
@@ -214,6 +217,7 @@ def tripadvisor():
             labeler.pop,
         ),
         pipeline.length_filterer(),
+        pipeline.kwargs_informer(name='tripadvisor'),
     )
     p.tokenizer = pipeline.frequency_tokenizer(p, 200)
     return p.run(_path('tripadvisor.pickle'))
@@ -245,6 +249,7 @@ def yelp():
             ),
         ),
         pipeline.length_filterer(),
+        pipeline.kwargs_informer(name='yelp'),
     )
     p.tokenizer = pipeline.frequency_tokenizer(p, 50)
     return p.run(_path('yelp.pickle'))
