@@ -253,3 +253,26 @@ def yelp():
     )
     p.tokenizer = pipeline.frequency_tokenizer(p, 50)
     return p.run(_path('yelp.pickle'))
+
+
+def nyt():
+    """Gets a Corpus containing roughly 40,000 news stories from 2004 published
+    by the New York Times.
+    """
+    p = pipeline.Pipeline(
+        download_inputer('nyt/nyt.tar.gz'),
+        pipeline.targz_extractor(pipeline.whole_extractor()),
+        pipeline.remove_tokenizer(
+            pipeline.stopword_tokenizer(
+                pipeline.default_tokenizer(),
+                itertools.chain(open_download('stopwords/english.txt'),
+                                open_download('stopwords/newsgroups.txt'))
+            ),
+            r'^(.{0,2}|.{15,})$', # remove any token t for which 2<len(t)<=15
+        ),
+        pipeline.title_labeler('id'),
+        pipeline.length_filterer(),
+        pipeline.kwargs_informer(name='nyt'),
+    )
+    p.tokenizer = pipeline.frequency_tokenizer(p, 150)
+    return p.run(_path('nyt.pickle'))

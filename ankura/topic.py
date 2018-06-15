@@ -68,6 +68,32 @@ def _gensim_assign(corpus, bows, lda, theta_attr, z_attr):
             doc.metadata[z_attr] = phi.argmax(axis=0)[w].tolist()
 
 
+def _icm(doc, topics, alpha):
+    T = topics.shape[1]
+    z = np.random.randint(T, size=len(doc.tokens))
+    c = np.zeros(T)
+    for z_n in z:
+        c[z_n] += 1
+
+    while True:
+        change = False
+
+        for n, (w_n, z_n) in enumerate(zip(doc.tokens, z)):
+            c[z_n] -= 1
+            cond = [alpha + c[t] * topics[w_n.token, t] for t in range(T)]
+            z[n] = np.argmax(cond)
+            c[z[n]] += 1
+            if z[n] != z_n:
+                change = True
+
+        if not change:
+            break
+
+    return z
+
+
+
+
 def cross_reference(corpus, theta_attr, xref_attr, n=sys.maxsize, threshold=1):
     """Finds the nearest documents by topic similarity.
 
