@@ -179,9 +179,34 @@ def coherence(reference_corpus, topic_summary, epsilon=1e-2, average_fn=np.mean)
     return np.array(scores)
 
 
+def significance_wuni(topic):
+    """Measures the distance of a topic from the uniform word distribution."""
+    V = len(topic)
+    return scipy.stats.entropy(topic, np.ones(V) / V)
+
+
+def significance_wvac(topic, Q):
+    """Measures the distance of a topic from the vacuous word distribution."""
+    vacuous = Q.sum(axis=1) / Q.sum()
+    return scipy.stats.entropy(topic, vacuous)
+
+
+def significance_dback(k, corpus, attr='theta'):
+    """Measures the distance of a topic from the background doc dist."""
+    D = len(corpus.documents)
+    bground = np.ones(D) / D
+
+    topic = np.array([doc.metadata[attr][k] for doc in corpus.documents])
+    topic /= topic.sum()
+
+    return scipy.stats.entropy(topic, bground)
+
+
+
 # Proposed Metrics for Token Level Topic Assignment
 
 def topic_switch_percent(corpus, attr='z'):
+    """Percentage of times the topic switches from one word to the next"""
     switches = 0
     n = 0
     for doc in corpus.documents:
@@ -194,6 +219,7 @@ def topic_switch_percent(corpus, attr='z'):
 
 
 def topic_switch_vi(corpus, attr='z'):
+    """Computes the VI on the topic switch distribution"""
     dist = Contingency()
     for doc in corpus.documents:
         z = doc.metadata[attr]
@@ -203,6 +229,7 @@ def topic_switch_vi(corpus, attr='z'):
 
 
 def topic_word_divergence(corpus, topics, attr='z'):
+    """JS divergence between avg topic-word dist and doc-word dist"""
     entropy = 0
     for doc in corpus.documents:
         if not doc.tokens:
@@ -218,6 +245,7 @@ def topic_word_divergence(corpus, topics, attr='z'):
 
 
 def window_prob(corpus, topics, attr='z', window_size=1, epsilon=1e-20):
+    """Probability of words drawn from avg topic-word dist of word window"""
     log_prob = 0
     for doc in corpus.documents:
         if not doc.tokens:
@@ -230,3 +258,15 @@ def window_prob(corpus, topics, attr='z', window_size=1, epsilon=1e-20):
                 raise ValueError(window, topics[t.token, window])
             log_prob += np.log(window_prob)
     return log_prob
+
+
+def avg_word_rank(corpus, topics, attr='z'):
+    """Avg topic-word rank of every word."""
+    n = 0
+    rsum = 0
+    ranks = np.argsort(topics, axis=1)
+    for doc in corpus.documents:
+        for w, z in zip(doc.tokens, doc.metadata[attr]):
+            rsum += ranks[w.token, z]
+            n += 1
+    return rsum / n
