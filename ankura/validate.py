@@ -202,7 +202,6 @@ def significance_dback(k, corpus, attr='theta'):
     return scipy.stats.entropy(topic, bground)
 
 
-
 # Proposed Metrics for Token Level Topic Assignment
 
 def topic_switch_percent(corpus, attr='z'):
@@ -226,6 +225,15 @@ def topic_switch_vi(corpus, attr='z'):
         for a, b in zip(z, z[1:]):
             dist[a, b] += 1
     return dist.vi()
+
+
+def topic_switch_contingency(corpus, attr='z'):
+    dist = Contingency()
+    for doc in corpus.documents:
+        z = doc.metadata[attr]
+        for a, b in zip(z, z[1:]):
+            dist[a, b] += 1
+    return dist
 
 
 def topic_word_divergence(corpus, topics, attr='z'):

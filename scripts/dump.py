@@ -260,30 +260,26 @@ def dump_cluster(corpus, K):
 importers = [
     ankura.corpus.newsgroups,
     ankura.corpus.amazon,
-    # ankura.corpus.nyt,
+    ankura.corpus.nyt,
 ]
-# dumps = [
-    # dump_cluster,
-    # dump_lda,
-    # dump_anchor,
+dumps = [
+    dump_lda,
+    dump_anchor,
     # dump_copula,
-# ]
-# Ks = [10, 20, 100]
+]
+Ks = [150, 200]
 
-# task_no = -1
-# num_nodes = int(os.environ.get('PSSH_NUMNODES', '1'))
-# node_num = int(os.environ.get('PSSH_NODENUM', '0'))
-# print('node:', num_nodes, '/', num_nodes)
-
-# for importer in importers:
-    # for dump, K in itertools.product(dumps, Ks):
-        # task_no += 1
-        # print('considering:', task_no, str(importer), str(dump), str(K))
-        # if task_no % num_nodes != node_num:
-            # print('skipping:', task_no)
-            # continue
-        # print('performing:', task_no)
-        # dump(importer(), K)
+task_no = -1
+num_nodes = int(os.environ.get('PSSH_NUMNODES', '1'))
+node_num = int(os.environ.get('PSSH_NODENUM', '0'))
+print('node:', num_nodes, '/', num_nodes)
 
 for importer in importers:
-    dump_copula(importer(), 100, 20)
+    for dump, K in itertools.product(dumps, Ks):
+        task_no += 1
+        print('considering:', task_no, str(importer), str(dump), str(K))
+        if task_no % num_nodes != node_num:
+            print('skipping:', task_no)
+            continue
+        print('performing:', task_no)
+        dump(importer(), K)
