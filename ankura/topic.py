@@ -7,6 +7,8 @@ import gensim as gs
 import numpy as np
 import scipy.spatial as sp
 
+from . import util
+
 
 def topic_summary(topics, corpus=None, n=10):
     """Gets the top n tokens per topic.
@@ -25,8 +27,8 @@ def topic_summary(topics, corpus=None, n=10):
     return summary
 
 
-def lda_assign(corpus, topics, theta_attr=None, z_attr=None):
-    """Assigns documents or tokens to topics using LDA with fixed topics
+def variational_assign(corpus, topics, theta_attr=None, z_attr=None):
+    """Assigns topics using variational inference (via gensim).
 
     If theta_attr is given, each document will be given a per-document topic
     distribution.  If z_attr is given, each document will be given a sequence
@@ -46,6 +48,34 @@ def lda_assign(corpus, topics, theta_attr=None, z_attr=None):
 
     bows = _gensim_bows(corpus)
     _gensim_assign(corpus, bows, lda, theta_attr, z_attr)
+
+
+def sampling_assign(corpus, topics, theta_attr=None, z_attr=None, alpha=0.1, num_iters=10):
+    if not theta_attr and not z_attr:
+        raise ValueError('Either theta_attr or z_attr must be given')
+
+    T = topics.shape[1]
+
+    c = np.zeroes((len(corpus.documents), T))
+    z = [np.random.randint(T, size=len(d.tokens)) for d in corpus.documents]
+    for d, z_d in enumerate(z):
+        for z_dn in z_d:
+            c[d, z_dn] += 1
+
+    for _ in range(num_iters):
+        for d, (doc, z_d) in enumerate(zip(corpus.documents, z)):
+            for n, w_dn in enumerate(doc.tokens):
+                z[d, z_d[n]] -= 1
+                cond = [alpha + c[d, t] * topics[w_dn.token, t] for t in range(T)]
+                z_d[n] = util.sample_categorical(cond)
+                c[d, z_d[n]] += 1
+
+    if theta_attr:
+        for doc, c_d in zip(corpus.documents, c):
+            doc.metadata[theta_attr] = c_d / c_d.sum()
+    if z_attr:
+        for doc, z_d in zip(corpus.documents, z):
+            doc.metadata[z_attr] = z_d.tolist()
 
 
 def _gensim_bows(corpus):
@@ -90,8 +120,6 @@ def _icm(doc, topics, alpha):
             break
 
     return z
-
-
 
 
 def cross_reference(corpus, theta_attr, xref_attr, n=sys.maxsize, threshold=1):
