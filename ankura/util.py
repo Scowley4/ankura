@@ -47,6 +47,10 @@ def sample_categorical(counts):
     raise ValueError(counts)
 
 
+def sample_categorical_np(counts):
+    return np.random.choice(len(counts), p=np.array(counts)/sum(counts))
+
+
 def random_projection(A, k):
     """Randomly projects the points (rows) of A into k-dimensions.
 

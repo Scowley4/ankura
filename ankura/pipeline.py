@@ -526,7 +526,7 @@ class Pipeline(object):
         return corpus
 
 
-def test_train_split(corpus, num_train=None, num_test=None, **kwargs):
+def train_test_split(corpus, num_train=None, num_test=None, **kwargs):
     """Creates train and test splits of a Corpus.
 
     By default, the split an 80/20 test/train split of the entire Corpus. If
