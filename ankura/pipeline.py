@@ -558,3 +558,14 @@ def train_test_split(corpus, num_train=None, num_test=None, **kwargs):
     if kwargs.get('return_ids'):
         return (train_ids, train), (test_ids, test)
     return train, test
+
+
+def sample_corpus(corpus, n, **kwargs):
+    """Creates a subset of a corpus.
+    """
+    doc_ids = np.random.choice(len(corpus.documents), size=n, replace=False)
+    subcorpus = Corpus([corpus.documents[d] for d in doc_ids], corpus.vocabulary, corpus.metadata)
+
+    if kwargs.get('return_ids'):
+        return doc_ids, subcorpus
+    return subcorpus

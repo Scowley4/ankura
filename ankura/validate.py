@@ -278,3 +278,28 @@ def avg_word_rank(corpus, topics, attr='z'):
             rsum += ranks[w.token, z]
             n += 1
     return rsum / n
+
+
+def topic_run_len(corpus, attr='z'):
+    s, n = 0, 0
+    for doc in corpus.documents:
+        l = 1
+        for z_i, z_j in zip(doc.metadata[attr][1:], doc.metadata[attr]):
+            if z_i == z_j:
+                l += 1
+            else:
+                s += l
+                n += 1
+                l = 1
+        s += l
+        n += 1
+    return s / n
+
+
+def majority_percent(corpus, attr='z'):
+    s = 0
+    for doc in corpus.documents:
+        c = collections.Counter(doc.metadata[attr])
+        s += max(c.values()) / len(doc.tokens)
+    return s / len(corpus.documents)
+

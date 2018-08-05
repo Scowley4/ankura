@@ -32,7 +32,7 @@ def variational_assign(corpus, topics, theta_attr=None, z_attr=None):
     """Assigns topics using variational inference (via gensim).
 
     If theta_attr is given, each document will be given a per-document topic
-    distribution.  If z_attr is given, each document will be given a sequence
+    distribution. If z_attr is given, each document will be given a sequence
     of topic assignments corresponding to the tokens in the document. One or
     both of these metadata attribute names must be given.
     """
@@ -120,7 +120,7 @@ def mode_assign2(corpus, topics, theta_attr=None, z_attr=None, alpha=.01, max_it
     if not theta_attr and not z_attr:
         raise ValueError('Either theta_attr or z_attr must be given')
 
-    for doc in corpus:
+    for doc in corpus.documents:
         best_z, best_c, best_p = _mode(doc, topics, max_iters, alpha)
 
         for _ in range(1, n):
@@ -132,9 +132,10 @@ def mode_assign2(corpus, topics, theta_attr=None, z_attr=None, alpha=.01, max_it
             doc.metadata[theta_attr] = best_c / best_c.sum()
         if z_attr:
             doc.metadata[z_attr] = best_z.tolist()
+            doc.metadata[z_attr] = best_z.tolist()
 
 
-def _mode(doc, topics, max_iters, bound):
+def _mode(doc, topics, max_iters, alpha):
     T = topics.shape[1]
 
     z = np.random.randint(T, size=len(doc.tokens))
@@ -149,17 +150,63 @@ def _mode(doc, topics, max_iters, bound):
             c[old] -= 1
 
             new = np.argmax([c[t] * topics[w_n.token, t] for t in range(T)])
-            change = change or new != old
+            changed = changed or new != old
 
             z[n] = new
             c[new] += 1
 
-        if not change:
+        if not changed:
             break
 
     p = sum(np.log(alpha + topics[w_n.token, z_n]) for w_n, z_n in zip(doc.tokens, z))
     return z, c, p
 
+
+def mode_assign3(corpus, topics, theta_attr=None, z_attr=None, alpha=.01, max_iters=100):
+    if not theta_attr and not z_attr:
+        raise ValueError('Either theta_attr or z_attr must be given')
+
+    T = topics.shape[1]
+
+    for doc in corpus.documents:
+        best_z, best_c, best_p = _mode(doc, topics, max_iters, alpha)
+
+        for t in range(T):
+            cand_z, cand_c, cand_p = _mode3(doc, topics, t, max_iters, alpha)
+            if cand_p > best_p:
+                best_z, best_c, best_p = cand_z, cand_c, cand_p
+
+        if theta_attr:
+            doc.metadata[theta_attr] = best_c / best_c.sum()
+        if z_attr:
+            doc.metadata[z_attr] = best_z.tolist()
+            doc.metadata[z_attr] = best_z.tolist()
+
+
+def _mode3(doc, topics, t, max_iters, alpha):
+    T = topics.shape[1]
+
+    z = np.ones(len(doc.tokens), dtype=np.int64) * t
+    c = np.zeros(T)
+    c[t] += len(doc.tokens)
+
+    for _ in range(max_iters):
+        changed = False
+        for n, w_n in enumerate(doc.tokens):
+            old = z[n]
+            c[old] -= 1
+
+            new = np.argmax([c[t] * topics[w_n.token, t] for t in range(T)])
+            changed = changed or new != old
+
+            z[n] = new
+            c[new] += 1
+
+        if not changed:
+            break
+
+    p = sum(np.log(alpha + topics[w_n.token, z_n]) for w_n, z_n in zip(doc.tokens, z))
+    return z, c, p
 
 
 def _gensim_bows(corpus):
@@ -252,6 +299,7 @@ def _sparse_topic_word(corpus, K, V, z_attr):
         for w, z in zip(doc.tokens, doc.metadata[z_attr]):
             data[d, w.token + z*V] += 1
     return data
+
 
 def classifier(train, topics, label_attr='label', z_attr='z', alpha=.01):
     K = topics.shape[1]
