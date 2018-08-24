@@ -18,7 +18,7 @@ import multiprocessing.pool
 from . import util
 
 
-def anchor_algorithm(corpus, k, doc_threshold=500, project_dim=1000):
+def anchor_algorithm(corpus, k, doc_threshold=500, project_dim=1000, **kwargs):
     """Implementation of the anchor algorithm by Arora et al. 2013.
 
     This call builds a cooccurrence matrix from the given corpus, extracts k
@@ -33,7 +33,7 @@ def anchor_algorithm(corpus, k, doc_threshold=500, project_dim=1000):
     """
     Q = build_cooccurrence(corpus)
     anchors = gram_schmidt_anchors(corpus, Q, k, doc_threshold, project_dim)
-    return recover_topics(Q, anchors)
+    return recover_topics(Q, anchors, **kwargs)
 
 
 def build_cooccurrence(corpus):
@@ -174,6 +174,7 @@ def tandem_anchors(anchors, Q, corpus=None, epsilon=1e-10):
     for i, anchor in enumerate(anchors):
         basis[i] = scipy.stats.hmean(Q[anchor, :] + epsilon, axis=0)
     return basis
+
 
 @util.jit
 def _exponentiated_gradient(Y, X, XX, epsilon):

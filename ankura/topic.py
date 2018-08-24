@@ -11,16 +11,27 @@ import sklearn.naive_bayes
 from . import util
 
 
-def topic_summary(topics, corpus=None, n=10):
+def topic_summary(topics, corpus=None, n=10, stopwords=None):
     """Gets the top n tokens per topic.
 
     If a vocabulary is provided, the tokens are returned instead of the types.
     """
+    if stopwords:
+        if not corpus:
+            raise ValueError('Corpus cannot be None if stopwords is given')
+        stopword_set = set(stopwords)
+        include = lambda v: v not in stopword_set
+    else:
+        include = lambda v: True
+
     summary = []
     for k in range(topics.shape[1]):
         index = []
-        for word in np.argsort(topics[:, k])[-n:][::-1]:
-            index.append(word)
+        for word in np.argsort(topics[:, k])[::-1]:
+            if include(corpus.vocabulary[word]):
+                index.append(word)
+            if len(index) == n:
+                break
         summary.append(index)
 
     if corpus:
@@ -116,9 +127,43 @@ def mode_assign(corpus, topics, theta_attr=None, z_attr=None, max_iters=100):
             doc.metadata[z_attr] = z_d.tolist()
 
 
+def mode_init_assign(corpus, topics, theta_attr=None, z_attr=None, max_iters=100):
+    if not theta_attr and not z_attr:
+        raise ValueError('Either theta_attr or z_attr must be given')
+    T = topics.shape[1]
+    inits = np.argmax(topics, axis=1)
+
+    for doc in corpus.documents:
+        z = [inits[t.token] for t in doc.tokens]
+        c = np.zeros(T)
+        for z_n in z:
+            c[z_n] += 1
+
+        for _ in range(max_iters):
+            changed = False
+            for n, w_n in enumerate(doc.tokens):
+                old = z[n]
+                c[old] -= 1
+
+                new = np.argmax([c[t] * topics[w_n.token, t] for t in range(T)])
+                changed = changed or new != old
+
+                z[n] = new
+                c[new] += 1
+
+            if not changed:
+                break
+
+        if theta_attr:
+            doc.metadata[theta_attr] = c / c.sum()
+        if z_attr:
+            doc.metadata[z_attr] = z.tolist()
+
+
 def mode_assign2(corpus, topics, theta_attr=None, z_attr=None, alpha=.01, max_iters=100, n=10):
     if not theta_attr and not z_attr:
         raise ValueError('Either theta_attr or z_attr must be given')
+    T = topics.shape[1]
 
     for doc in corpus.documents:
         best_z, best_c, best_p = _mode(doc, topics, max_iters, alpha)
@@ -131,7 +176,6 @@ def mode_assign2(corpus, topics, theta_attr=None, z_attr=None, alpha=.01, max_it
         if theta_attr:
             doc.metadata[theta_attr] = best_c / best_c.sum()
         if z_attr:
-            doc.metadata[z_attr] = best_z.tolist()
             doc.metadata[z_attr] = best_z.tolist()
 
 
@@ -253,7 +297,8 @@ def _icm(doc, topics, alpha):
     return z
 
 
-def cross_reference(corpus, theta_attr, xref_attr, n=sys.maxsize, threshold=1):
+def cross_reference(corpus, theta_attr, xref_attr, title_attr=None,
+        n=sys.maxsize, threshold=1, doc_ids=None):
     """Finds the nearest documents by topic similarity.
 
     The documents of the corpus must include a metadata value for theta_attr
@@ -268,13 +313,24 @@ def cross_reference(corpus, theta_attr, xref_attr, n=sys.maxsize, threshold=1):
     matches should be returned. The resulting cross references are stored on
     each document of the Corpus under the xref_attr.
     """
-    for doc in corpus.documents:
+    # for doc in corpus.documents:
+        # xrefs = [corpus.documents[d] for d in np.random.randint(len(corpus.documents), size=np.random.randint(0, 10))]
+        # if title_attr:
+            # xrefs = [doc.metadata[title_attr] for doc in xrefs]
+        # doc.metadata[xref_attr] = xrefs
+
+    if doc_ids is None:
+        doc_ids = range(len(corpus.documents))
+    for d in doc_ids:
+        doc = corpus.documents[d]
         doc_theta = doc.metadata[theta_attr]
         dists = [spatial.distance.cosine(doc_theta, d.metadata[theta_attr])
                  if doc is not d else float('nan')
                  for d in corpus.documents]
         dists = np.array(dists)
-        xrefs = list(corpus.documents[i] for i in dists.argsort()[:n] if dists[i] <= threshold)
+        xrefs = [corpus.documents[i] for i in dists.argsort()[:n] if dists[i] <= threshold]
+        if title_attr:
+            xrefs = [doc.metadata[title_attr] for doc in xrefs]
         doc.metadata[xref_attr] = xrefs
 
 

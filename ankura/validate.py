@@ -302,4 +302,3 @@ def majority_percent(corpus, attr='z'):
         c = collections.Counter(doc.metadata[attr])
         s += max(c.values()) / len(doc.tokens)
     return s / len(corpus.documents)
-

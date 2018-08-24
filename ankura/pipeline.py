@@ -22,6 +22,7 @@ import re
 import string
 import tarfile
 
+import nltk
 import bs4
 import numpy as np
 
@@ -190,6 +191,13 @@ def default_tokenizer():
     punctuation. Empty tokens are removed.
     """
     return translate_tokenizer(split_tokenizer())
+
+
+def stemming_tokenizer(base_tokenizer):
+    stemmer = nltk.stem.PorterStemmer()
+    def _tokenizer(data):
+        return [TokenLoc(stemmer.stem(t.token), t.loc) for t in base_tokenizer(data)]
+    return _tokenizer
 
 
 def regex_tokenizer(base_tokenizer, pattern, repl):
@@ -453,6 +461,13 @@ def kwargs_informer(**kwargs):
     @functools.wraps(kwargs_informer)
     def _informer(corpus):
         return kwargs
+    return _informer
+
+
+def title_informer(corpus_attr, title_attr):
+    @functools.wraps(title_informer)
+    def _informer(corpus):
+        return {corpus_attr: {doc.metadata[title_attr]: d for d, doc in enumerate(corpus.documents)}}
     return _informer
 
 

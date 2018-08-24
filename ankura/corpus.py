@@ -73,11 +73,11 @@ def download_inputer(*names):
     return _inputer
 
 
-def bible():
+def bible(remove_empty=False):
     """Gets a Corpus containing the King James version of the Bible with over
     250,000 cross references.
     """
-    p= pipeline.Pipeline(
+    p = pipeline.Pipeline(
         download_inputer('bible/bible.txt'),
         pipeline.line_extractor(),
         pipeline.stopword_tokenizer(
@@ -98,7 +98,55 @@ def bible():
         pipeline.kwargs_informer(name='bible'),
     )
     p.tokenizer = pipeline.frequency_tokenizer(p, 2)
-    return p.run(_path('bible.pickle'))
+    bible =  p.run(_path('bible.pickle'))
+    if remove_empty:
+        keep = [doc for doc in bible.documents if doc.tokens]
+        bible = pipeline.Corpus(keep, bible.vocabulary, bible.metadata)
+    return bible
+
+
+def full_bible():
+    p = pipeline.Pipeline(
+        download_inputer('bible/bible.txt'),
+        pipeline.line_extractor(),
+        pipeline.default_tokenizer(),
+        pipeline.composite_labeler(
+            pipeline.title_labeler('verse'),
+            pipeline.list_labeler(
+                open_download('bible/xref.txt'),
+                'xref',
+            ),
+        ),
+        pipeline.keep_filterer(),
+        pipeline.composite_informer(
+            pipeline.kwargs_informer(name='bible'),
+            pipeline.title_informer('verses', 'verse'),
+        ),
+    )
+    return p.run(_path('full_bible.pickle'))
+
+
+def full_bible_stemmed():
+    p = pipeline.Pipeline(
+        download_inputer('bible/bible.txt'),
+        pipeline.line_extractor(),
+        pipeline.stemming_tokenizer(
+            pipeline.default_tokenizer(),
+        ),
+        pipeline.composite_labeler(
+            pipeline.title_labeler('verse'),
+            pipeline.list_labeler(
+                open_download('bible/xref.txt'),
+                'xref',
+            ),
+        ),
+        pipeline.keep_filterer(),
+        pipeline.composite_informer(
+            pipeline.kwargs_informer(name='bible'),
+            pipeline.title_informer('verses', 'verse'),
+        ),
+    )
+    return p.run(_path('full_bible_stemmed.pickle'))
 
 
 def newsgroups():
