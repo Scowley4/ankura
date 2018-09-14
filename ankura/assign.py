@@ -8,6 +8,7 @@ Corpus object as metadata attributes on the constituent Document objects.
 Beyond these first four parameters, there may be additional optional parameters
 which further specify how the assignments should be made.
 """
+import collections
 
 import gensim as gs
 import numpy as np
@@ -161,5 +162,3 @@ def mode_word_init(corpus, topics, theta_attr=None, z_attr=None, max_iters=100):
             doc.metadata[theta_attr] = c / c.sum()
         if z_attr:
             doc.metadata[z_attr] = z
-
-

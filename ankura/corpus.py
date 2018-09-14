@@ -13,7 +13,6 @@ in the path given by `download_dir`, and data will be downloaded from
 `base_url`. By default, `download_dir` will be '$HOME/.ankura' while base_url
 will point at a GitHub repo designed for use with
 """
-
 import functools
 import itertools
 import os

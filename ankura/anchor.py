@@ -9,7 +9,6 @@ process of recovering topics using anchor words is as follows:
 Variants of the anchor algorithm generally work by changing how the cooccurrence
 matrix is constructed and/or how the anchor words are chosen.
 """
-
 import collections
 import numpy as np
 import scipy.stats

@@ -1,6 +1,5 @@
 """Functions for displaying topics or using them in downstream tasks"""
 
-import collections
 import sys
 
 import numpy as np

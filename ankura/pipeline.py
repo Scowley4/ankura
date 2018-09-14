@@ -10,7 +10,6 @@ These pieces form a Pipeline, which can then be run to import a Corpus which is
 usable throughout ankura. See `ankura.corpus` for examples of how these
 Pipeline can be used to import data.
 """
-
 import collections
 import functools
 import glob
