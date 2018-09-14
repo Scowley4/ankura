@@ -13,30 +13,30 @@ node_num = int(os.environ.get('PSSH_NODENUM', '0'))
 num_nodes = int(os.environ.get('PSSH_NUMNODES', '1'))
 
 corpora = [
-    (ankura.corpus.newsgroups, 40, 'newsgroup'),
-    (ankura.corpus.newsgroups, 4000, 'newsgroup'),
-    (ankura.corpus.amazon, 20, 'binary_rating'),
-    (ankura.corpus.amazon, 2000, 'binary_rating'),
-    (ankura.corpus.nyt, 10, None),
-    (ankura.corpus.nyt, 1000, None),
+    (lambda : ankura.corpus.newsgroups(), 40, 'newsgroup'),
+    (lambda : ankura.corpus.newsgroups(5), 4000, 'newsgroup'),
+    (lambda : ankura.corpus.amazon(), 20, 'binary_rating'),
+    (lambda : ankura.corpus.amazon(5), 2000, 'binary_rating'),
+    (lambda : ankura.corpus.nyt(), 10, None),
+    (lambda : ankura.corpus.nyt(5), 1000, None),
 ]
 algos = [
-    ('vari', ankura.topic.variational_assign),
-    ('gibb', ankura.topic.sampling_assign),
-    ('icmr', ankura.topic.mode_assign2),
-    ('icmw', ankura.topic.mode_init_assign),
-    # ('icms', ankura.topic.mode_init_assign),
+    ('vari', ankura.assign.variational),
+    ('gibb', ankura.assign.sampling),
+    ('icmr', ankura.assign.mode),
+    ('modw', ankura.assign.mode_word_init),
 ]
 
 writer = csv.DictWriter(sys.stdout, [
+    'dataset',
     'algo',
     'k',
     'accuracy',
     'coherence',
+    'consistency',
     'sigwuni',
     'sigwvac',
     'sigdbak',
-    'switchp',
 ])
 writer.writeheader()
 
@@ -51,7 +51,7 @@ for (data, k, label), (algo, assign) in itertools.product(corpora, algos):
     corpus = data()
     train, test = ankura.pipeline.train_test_split(corpus)
     Q = ankura.anchor.build_cooccurrence(corpus)
-    anchors = ankura.anchor.gram_schmidt_anchors(corpus, Q, k, 500 if k < 1000 else 5)
+    anchors = ankura.anchor.gram_schmidt_anchors(corpus, Q, k, 500 if k < 1000 else 10)
     topics = ankura.anchor.recover_topics(Q, anchors)
 
     topic_cols = [topics[:, t] for t in range(k)]
@@ -67,12 +67,13 @@ for (data, k, label), (algo, assign) in itertools.product(corpora, algos):
             contingency[gp] += 1
 
     writer.writerow({
+        'dataset': corpus.metadata['name'],
         'algo': algo,
         'k': k,
         'accuracy': contingency.accuracy() if label else 0,
         'coherence': ankura.validate.coherence(corpus, summary),
+        'consistency': ankura.validate.consistency(corpus, z_attr),
         'sigwuni': np.mean([ankura.validate.significance_wuni(t) for t in topic_cols]),
         'sigwvac': np.mean([ankura.validate.significance_wvac(t, Q) for t in topic_cols]),
         'sigdbak': np.mean([ankura.validate.significance_dback(t, corpus, t_attr) for t in range(k)]),
-        'switchp': ankura.validate.topic_switch_percent(corpus, z_attr),
     })
