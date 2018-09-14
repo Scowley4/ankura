@@ -4,11 +4,14 @@ The available datasets (and corresponding import functions) include:
     * bible
     * newsgroups
     * amazon
+    * tripadvisor
+    * yelp
+    * nyt
 These imports depend on two module variables which can be mutated to change the
 download behavior of these imports. Downloaded and pickled data will be stored
 in the path given by `download_dir`, and data will be downloaded from
 `base_url`. By default, `download_dir` will be '$HOME/.ankura' while base_url
-will point at a GitHub repo designed for use with 
+will point at a GitHub repo designed for use with
 """
 
 import functools
@@ -21,7 +24,11 @@ import posixpath
 
 download_dir = os.path.join(os.getenv('HOME'), '.ankura')
 
-def _path(name):
+def _path(name, *opts):
+    if opts:
+        name, dot, ext = name.partition('.')
+        opts =  '_'.join('-' if opt is None else str(int(opt)) for opt in opts)
+        name = '{}_{}{}{}'.format(name, opts, dot, ext)
     return os.path.join(download_dir, name)
 
 
@@ -58,13 +65,10 @@ def open_download(name, mode='r'):
 
 def download_inputer(*names):
     """Generates file objects for the given names, downloading the data to
-    download_dir from base_url if needed. Using the default base_url the
-    available names are:
-        * bible/bible.txt
-        * bible/xref.txt
-        * newsgroups/newsgroups.tar.gz
-        * stopwords/english.txt
-        * stopwords/jacobean.txt
+    download_dir from base_url if needed. The expected names reflect the
+    filenames in the default base_url and are used throughout this module. In
+    otherwords, if base_url is changed, it may break the import functions in
+    the module which rely on download_inputer.
     """
     @functools.wraps(download_inputer)
     def _inputer():
@@ -73,20 +77,33 @@ def download_inputer(*names):
     return _inputer
 
 
-def bible(remove_empty=False):
+def bible(remove_stopwords=True, remove_empty=False, use_stemmer=False):
     """Gets a Corpus containing the King James version of the Bible with over
     250,000 cross references.
+
+    If remove_stopwords is True (default: True), then stopwords, both modern
+    and Jacobean will be pruned from the corpus vocabulary.
+    If remove_empty is True (default: False), then words which appear in 0 or 1
+    documents will be removed, and any empty documents will be removed.
+    If use_stemmer is True (default False), then each token will be stemmed
+    using the Porter stemming algorithm.
     """
-    p = pipeline.Pipeline(
-        download_inputer('bible/bible.txt'),
-        pipeline.line_extractor(),
-        pipeline.stopword_tokenizer(
-            pipeline.default_tokenizer(),
+    tokenizer = pipeline.default_tokenizer()
+    if remove_stopwords:
+        tokenizer = pipeline.stopword_tokenizer(
+            tokenizer,
             itertools.chain(
                 open_download('stopwords/english.txt'),
                 open_download('stopwords/jacobean.txt'),
-            )
-        ),
+            ),
+        )
+    if use_stemmer:
+        tokenizer = pipeline.stemming_tokenizer(tokenizer)
+
+    p = pipeline.Pipeline(
+        download_inputer('bible/bible.txt'),
+        pipeline.line_extractor(),
+        tokenizer,
         pipeline.composite_labeler(
             pipeline.title_labeler('verse'),
             pipeline.list_labeler(
@@ -97,61 +114,29 @@ def bible(remove_empty=False):
         pipeline.keep_filterer(),
         pipeline.kwargs_informer(name='bible'),
     )
-    p.tokenizer = pipeline.frequency_tokenizer(p, 2)
-    bible =  p.run(_path('bible.pickle'))
+
     if remove_empty:
-        keep = [doc for doc in bible.documents if doc.tokens]
-        bible = pipeline.Corpus(keep, bible.vocabulary, bible.metadata)
+        p.tokenizer = pipeline.frequency_tokenizer(p, 2)
+    bible = p.run(_path('bible.pickle',
+        remove_stopwords,
+        remove_empty,
+        use_stemmer,
+    ))
+    if remove_empty:
+        bible = pipeline.select_docs(bible, lambda d: d.tokens)
+
     return bible
 
 
-def full_bible():
-    p = pipeline.Pipeline(
-        download_inputer('bible/bible.txt'),
-        pipeline.line_extractor(),
-        pipeline.default_tokenizer(),
-        pipeline.composite_labeler(
-            pipeline.title_labeler('verse'),
-            pipeline.list_labeler(
-                open_download('bible/xref.txt'),
-                'xref',
-            ),
-        ),
-        pipeline.keep_filterer(),
-        pipeline.composite_informer(
-            pipeline.kwargs_informer(name='bible'),
-            pipeline.title_informer('verses', 'verse'),
-        ),
-    )
-    return p.run(_path('full_bible.pickle'))
-
-
-def full_bible_stemmed():
-    p = pipeline.Pipeline(
-        download_inputer('bible/bible.txt'),
-        pipeline.line_extractor(),
-        pipeline.stemming_tokenizer(
-            pipeline.default_tokenizer(),
-        ),
-        pipeline.composite_labeler(
-            pipeline.title_labeler('verse'),
-            pipeline.list_labeler(
-                open_download('bible/xref.txt'),
-                'xref',
-            ),
-        ),
-        pipeline.keep_filterer(),
-        pipeline.composite_informer(
-            pipeline.kwargs_informer(name='bible'),
-            pipeline.title_informer('verses', 'verse'),
-        ),
-    )
-    return p.run(_path('full_bible_stemmed.pickle'))
-
-
-def newsgroups():
+def newsgroups(rare_threshold=100, common_threshold=2000):
     """Gets a Corpus containing roughly 20,000 usenet postings from 20
     different newsgroups in the early 1990's.
+
+    The rare_threshold (default: 100) is the minimum number of documents a word
+    must appear in to be retained.
+    The common_threshold (default: 2000) is the maximum number of documents a
+    word can appear in to be retained.
+    Both options can be set to None to disable filtering.
     """
     coarse_mapping = {
         'comp.graphics': 'comp',
@@ -200,68 +185,23 @@ def newsgroups():
         pipeline.length_filterer(),
         pipeline.kwargs_informer(name='newsgroups'),
     )
-    p.tokenizer = pipeline.frequency_tokenizer(p, 100, 2000)
-    return p.run(_path('newsgroups.pickle'))
+    if rare_threshold or common_threshold:
+        p.tokenizer = pipeline.frequency_tokenizer(p,
+            rare_threshold,
+            common_threshold,
+        )
+    return p.run(_path('newsgroups.pickle',
+        rare_threshold,
+        common_threshold,
+    ))
 
 
-def newsgroups_unfiltered():
-    """Gets a Corpus containing roughly 20,000 usenet postings from 20
-    different newsgroups in the early 1990's.
-    """
-    coarse_mapping = {
-        'comp.graphics': 'comp',
-        'comp.os.ms-windows.misc': 'comp',
-        'comp.sys.ibm.pc.hardware': 'comp',
-        'comp.sys.mac.hardware': 'comp',
-        'comp.windows.x': 'comp',
-        'rec.autos': 'rec',
-        'rec.motorcycles': 'rec',
-        'rec.sport.baseball': 'rec',
-        'rec.sport.hockey': 'rec',
-        'sci.crypt': 'sci',
-        'sci.electronics': 'sci',
-        'sci.med': 'sci',
-        'sci.space': 'sci',
-        'misc.forsale': 'misc',
-        'talk.politics.misc': 'politics',
-        'talk.politics.guns': 'politics',
-        'talk.politics.mideast': 'politics',
-        'talk.religion.misc' : 'religion',
-        'alt.atheism' : 'religion',
-        'soc.religion.christian' : 'religion',
-    }
-
-    p = pipeline.Pipeline(
-        download_inputer('newsgroups/newsgroups.tar.gz'),
-        pipeline.targz_extractor(
-            pipeline.skip_extractor(errors='replace'),
-        ),
-        pipeline.remove_tokenizer(
-            pipeline.stopword_tokenizer(
-                pipeline.default_tokenizer(),
-                itertools.chain(open_download('stopwords/english.txt'),
-                                open_download('stopwords/newsgroups.txt'))
-            ),
-            r'^(.{0,2}|.{15,})$', # remove any token t for which 2<len(t)<=15
-        ),
-        pipeline.composite_labeler(
-            pipeline.title_labeler('id'),
-            pipeline.dir_labeler('newsgroup'),
-            pipeline.transform_labeler(
-                pipeline.dir_labeler('coarse_newsgroup'),
-                coarse_mapping.get,
-            ),
-        ),
-        pipeline.length_filterer(),
-        pipeline.kwargs_informer(name='newsgroups'),
-    )
-    p.tokenizer = pipeline.frequency_tokenizer(p, 5)
-    return p.run(_path('newsgroups_unfiltered.pickle'))
-
-
-def amazon():
+def amazon(rare_threshold=50):
     """Gets a Corpus containing roughly 40,000 Amazon product reviews, with
     star ratings.
+
+    The rare_threshold (default: 50) is the mimimum number of documents word
+    must appear in to be retained. It may be set to None to disable filtering.
     """
     p = pipeline.Pipeline(
         download_inputer('amazon/amazon.txt'),
@@ -287,8 +227,9 @@ def amazon():
         pipeline.length_filterer(),
         pipeline.kwargs_informer(name='amazon'),
     )
-    p.tokenizer = pipeline.frequency_tokenizer(p, 50)
-    return p.run(_path('amazon.pickle'))
+    if rare_threshold:
+        p.tokenizer = pipeline.frequency_tokenizer(p, rare_threshold)
+    return p.run(_path('amazon.pickle', rare_threshold))
 
 
 def tripadvisor():
@@ -358,9 +299,12 @@ def yelp():
     return p.run(_path('yelp.pickle'))
 
 
-def nyt():
+def nyt(rare_threshold=150):
     """Gets a Corpus containing roughly 40,000 news stories from 2004 published
     by the New York Times.
+
+    The rare_threshold (default: 150) is the mimimum number of documents word
+    must appear in to be retained. It may be set to None to disable filtering.
     """
     p = pipeline.Pipeline(
         download_inputer('nyt/nyt.tar.gz'),
@@ -377,5 +321,6 @@ def nyt():
         pipeline.length_filterer(),
         pipeline.kwargs_informer(name='nyt'),
     )
-    p.tokenizer = pipeline.frequency_tokenizer(p, 150)
-    return p.run(_path('nyt.pickle'))
+    if rare_threshold:
+        p.tokenizer = pipeline.frequency_tokenizer(p, rare_threshold)
+    return p.run(_path('nyt.pickle', rare_threshold))

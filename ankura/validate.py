@@ -144,6 +144,8 @@ class Contingency(object):
         return gsums, psums, total
 
 
+# Measure of global topic quality
+
 def coherence(reference_corpus, topic_summary, epsilon=1e-2, average_fn=np.mean):
     """Computes topic coherence following Mimno et al., 2011 using pairwise log
     conditional probability taken from a reference corpus.
@@ -179,6 +181,9 @@ def coherence(reference_corpus, topic_summary, epsilon=1e-2, average_fn=np.mean)
     return np.array(scores)
 
 
+# Significance measures proposed by AlSumait et al, 2009
+
+
 def significance_wuni(topic):
     """Measures the distance of a topic from the uniform word distribution."""
     V = len(topic)
@@ -202,9 +207,9 @@ def significance_dback(k, corpus, attr='theta'):
     return scipy.stats.entropy(topic, bground)
 
 
-# Proposed Metrics for Token Level Topic Assignment
+# Proposed Metric for measuring local topic quality.
 
-def topic_switch_percent(corpus, attr='z'):
+def consistency(corpus, attr='z'):
     """Percentage of times the topic switches from one word to the next"""
     switches = 0
     n = 0
@@ -215,90 +220,3 @@ def topic_switch_percent(corpus, attr='z'):
                 switches += 1
             n += 1
     return switches / n
-
-
-def topic_switch_vi(corpus, attr='z'):
-    """Computes the VI on the topic switch distribution"""
-    dist = Contingency()
-    for doc in corpus.documents:
-        z = doc.metadata[attr]
-        for a, b in zip(z, z[1:]):
-            dist[a, b] += 1
-    return dist.vi()
-
-
-def topic_switch_contingency(corpus, attr='z'):
-    dist = Contingency()
-    for doc in corpus.documents:
-        z = doc.metadata[attr]
-        for a, b in zip(z, z[1:]):
-            dist[a, b] += 1
-    return dist
-
-
-def topic_word_divergence(corpus, topics, attr='z'):
-    """JS divergence between avg topic-word dist and doc-word dist"""
-    entropy = 0
-    for doc in corpus.documents:
-        if not doc.tokens:
-            continue
-        p = np.mean(topics[:, doc.metadata[attr]], axis=1)
-        q = np.zeros_like(p)
-        for t in doc.tokens:
-            q[t.token] += 1
-        q /= np.sum(q)
-        m = (p + q) / 2
-        entropy += scipy.stats.entropy(p, m) + scipy.stats.entropy(q, m)
-    return entropy / 2 / len(corpus.documents)
-
-
-def window_prob(corpus, topics, attr='z', window_size=1, epsilon=1e-20):
-    """Probability of words drawn from avg topic-word dist of word window"""
-    log_prob = 0
-    for doc in corpus.documents:
-        if not doc.tokens:
-            continue
-        z = doc.metadata[attr]
-        for n, t in enumerate(doc.tokens):
-            window = z[max(0, n-window_size):n+window_size+1]
-            window_prob = np.mean(topics[t.token, window] + epsilon)
-            if window_prob == 0:
-                raise ValueError(window, topics[t.token, window])
-            log_prob += np.log(window_prob)
-    return log_prob
-
-
-def avg_word_rank(corpus, topics, attr='z'):
-    """Avg topic-word rank of every word."""
-    n = 0
-    rsum = 0
-    ranks = np.argsort(topics, axis=1)
-    for doc in corpus.documents:
-        for w, z in zip(doc.tokens, doc.metadata[attr]):
-            rsum += ranks[w.token, z]
-            n += 1
-    return rsum / n
-
-
-def topic_run_len(corpus, attr='z'):
-    s, n = 0, 0
-    for doc in corpus.documents:
-        l = 1
-        for z_i, z_j in zip(doc.metadata[attr][1:], doc.metadata[attr]):
-            if z_i == z_j:
-                l += 1
-            else:
-                s += l
-                n += 1
-                l = 1
-        s += l
-        n += 1
-    return s / n
-
-
-def majority_percent(corpus, attr='z'):
-    s = 0
-    for doc in corpus.documents:
-        c = collections.Counter(doc.metadata[attr])
-        s += max(c.values()) / len(doc.tokens)
-    return s / len(corpus.documents)

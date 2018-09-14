@@ -18,7 +18,7 @@ import multiprocessing.pool
 from . import util
 
 
-def anchor_algorithm(corpus, k, doc_threshold=500, project_dim=1000, **kwargs):
+def anchor_algorithm(corpus, k, doc_threshold=500, project_dim=1000):
     """Implementation of the anchor algorithm by Arora et al. 2013.
 
     This call builds a cooccurrence matrix from the given corpus, extracts k
@@ -33,7 +33,7 @@ def anchor_algorithm(corpus, k, doc_threshold=500, project_dim=1000, **kwargs):
     """
     Q = build_cooccurrence(corpus)
     anchors = gram_schmidt_anchors(corpus, Q, k, doc_threshold, project_dim)
-    return recover_topics(Q, anchors, **kwargs)
+    return recover_topics(Q, anchors)
 
 
 def build_cooccurrence(corpus):
@@ -70,7 +70,7 @@ def build_cooccurrence(corpus):
     return Q / D
 
 
-def gram_schmidt_anchors(corpus, Q, k, doc_threshold=500, project_dim=1000, **kwargs):
+def gram_schmidt_anchors(corpus, Q, k, doc_threshold=500, project_dim=1000, return_indicies=False):
     """Uses stabilized Gram-Schmidt decomposition to find k anchors.
 
     Each row of Q represents a word embedded in V-dimensional space, with each
@@ -138,7 +138,7 @@ def gram_schmidt_anchors(corpus, Q, k, doc_threshold=500, project_dim=1000, **kw
         basis[j] = Q[indices[j + 1]] / np.sqrt(max_dist)
 
     # If requested, just return the indices instead of anchor vectors
-    if kwargs.get('return_indices'):
+    if return_indicies:
         return indices
 
     # Use the original Q to extract anchor vectors using the anchor indices
@@ -253,7 +253,7 @@ def _exponentiated_gradient(Y, X, XX, epsilon):
     return alpha
 
 
-def recover_topics(Q, anchors, epsilon=2e-6, **kwargs):
+def recover_topics(Q, anchors, epsilon=2e-6):
     """Recovers topics given a cooccurrence matrix and a set of anchor vectors.
 
     We represent each word (rows of the cooccurrence matrix Q) as a convex
@@ -291,21 +291,12 @@ def recover_topics(Q, anchors, epsilon=2e-6, **kwargs):
     XX = np.dot(X, X.transpose())
 
     # Represent each word as a convex combination of anchors.
-    parallelism = kwargs.get('parallelism')
-    if parallelism:
-        worker = lambda word: _exponentiated_gradient(Q[word], X, XX, epsilon)
-        chunksize = kwargs.get('chunksize', V // parallelism)
-        with multiprocessing.pool.ThreadPool(parallelism) as pool:
-            C = pool.map(worker, range(V), chunksize)
-        C = np.array(C)
-    else:
-        C = np.zeros((V, K))
-        for word in range(V):
-            C[word] = _exponentiated_gradient(Q[word], X, XX, epsilon)
+    C = np.zeros((V, K))
+    for word in range(V):
+        C[word] = _exponentiated_gradient(Q[word], X, XX, epsilon)
 
     # Use Bayes rule to compute topic matrix
     A = np.dot(P_w, C)
     for k in range(K):
         A[:, k] = A[:, k] / A[:, k].sum()
-
     return A

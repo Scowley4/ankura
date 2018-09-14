@@ -26,7 +26,7 @@ import nltk
 import bs4
 import numpy as np
 
-# POD types used throughout the pipeline process
+# POD types used throughout the pipeline process and ankura in general.
 
 Text = collections.namedtuple('Text', 'name data')
 TokenLoc = collections.namedtuple('TokenLoc', 'token loc')
@@ -541,7 +541,9 @@ class Pipeline(object):
         return corpus
 
 
-def train_test_split(corpus, num_train=None, num_test=None, **kwargs):
+# Additional utility functions for modifing or sampling from existing Corpus.
+
+def train_test_split(corpus, num_train=None, num_test=None, return_ids=False):
     """Creates train and test splits of a Corpus.
 
     By default, the split an 80/20 test/train split of the entire Corpus. If
@@ -570,17 +572,27 @@ def train_test_split(corpus, num_train=None, num_test=None, **kwargs):
     train = Corpus([corpus.documents[d] for d in train_ids], corpus.vocabulary, corpus.metadata)
     test = Corpus([corpus.documents[d] for d in test_ids], corpus.vocabulary, corpus.metadata)
 
-    if kwargs.get('return_ids'):
+    if return_ids:
         return (train_ids, train), (test_ids, test)
     return train, test
 
 
-def sample_corpus(corpus, n, **kwargs):
+def sample_corpus(corpus, n, return_ids=False):
     """Creates a subset of a corpus.
     """
     doc_ids = np.random.choice(len(corpus.documents), size=n, replace=False)
     subcorpus = Corpus([corpus.documents[d] for d in doc_ids], corpus.vocabulary, corpus.metadata)
 
-    if kwargs.get('return_ids'):
+    if return_ids:
         return doc_ids, subcorpus
     return subcorpus
+
+
+def select_docs(corpus, select_fn):
+    """Creates a new Corpus with only a selection of documents.
+
+    The select_fn is a function which takes a document as input and returns
+    True if the document should be included in the selection.
+    """
+    keep = [doc for doc in corpus.documents if select_fn(doc)]
+    return Corpus(keep, corpus.vocabulary, corpus.metadata)

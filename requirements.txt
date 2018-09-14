@@ -1,3 +1,7 @@
+bs4
+gensim
+nltk
+numba
 numpy
 scipy
-gensim
+sklearn
