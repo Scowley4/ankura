@@ -1,8 +1,9 @@
 import ankura
 import csv
+import functools
 import itertools
-import sys
 import os
+import sys
 
 import numpy as np
 
@@ -12,19 +13,23 @@ task_no = -1
 node_num = int(os.environ.get('PSSH_NODENUM', '0'))
 num_nodes = int(os.environ.get('PSSH_NUMNODES', '1'))
 
+np.random.seed(314159268)
+seeds = [int(np.random.random() * (2*32-1)) for _ in range(1)]
+
 corpora = [
     (lambda : ankura.corpus.newsgroups(), 40, 'newsgroup'),
-    (lambda : ankura.corpus.newsgroups(5), 4000, 'newsgroup'),
+    (lambda : ankura.corpus.newsgroups(15, None), 2000, 'newsgroup'),
     (lambda : ankura.corpus.amazon(), 20, 'binary_rating'),
-    (lambda : ankura.corpus.amazon(5), 2000, 'binary_rating'),
+    (lambda : ankura.corpus.amazon(15), 1000, 'binary_rating'),
     (lambda : ankura.corpus.nyt(), 10, None),
-    (lambda : ankura.corpus.nyt(5), 1000, None),
+    (lambda : ankura.corpus.nyt(15), 500, None),
 ]
 algos = [
     ('vari', ankura.assign.variational),
     ('gibb', ankura.assign.sampling),
+    ('icms', functools.partial(ankura.assign.mode, n=1)),
     ('icmr', ankura.assign.mode),
-    ('modw', ankura.assign.mode_word_init),
+    ('icmw', ankura.assign.mode_word_init),
 ]
 
 writer = csv.DictWriter(sys.stdout, [
@@ -40,10 +45,12 @@ writer = csv.DictWriter(sys.stdout, [
 ])
 writer.writeheader()
 
-for (data, k, label), (algo, assign) in itertools.product(corpora, algos):
+for seed, (data, k, label), (algo, assign) in itertools.product(seeds, corpora, algos):
     task_no += 1
     if task_no % num_nodes != node_num:
         continue
+
+    np.random.seed(seed)
 
     z_attr = '{}_{}_z'.format(algo, k)
     t_attr = '{}_{}_t'.format(algo, k)
