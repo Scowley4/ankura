@@ -11,20 +11,34 @@ task_no = -1
 node_num = int(os.environ.get('PSSH_NODENUM', '0'))
 num_nodes = int(os.environ.get('PSSH_NUMNODES', '1'))
 
-bible = ankura.corpus.full_bible_stemmed()
-sample = np.random.choice(len(bible.documents), size=1000, replace=False)
+bible = ankura.corpus.bible(remove_stopwords=False, remove_empty=False, use_stemmer=True)
+Q = ankura.anchor.build_cooccurrence(bible)
+
+np.random.seed(314159286)
+seeds = [int(np.random.random() * (2**32-1)) for _ in range(1)]
 
 writer = csv.DictWriter(sys.stdout, [
     'algo',
     'k',
-    'doct',
     'thet',
     'f1',
     'precision',
     'recall',
     'specificity',
+    'consistency',
+    'significance',
 ])
 writer.writeheader()
+
+
+def gs_anchors(k):
+    return ankura.anchor.gram_schmidt_anchors(bible, Q, k, doc_threshold=5)
+
+
+def rp_anchors(k):
+    anchor_docs = np.random.choice(len(bible.documents), size=k, replace=False)
+    anchor_indices = [[t.token for t in bible.documents[d].tokens] for d in anchor_docs]
+    return ankura.anchor.tandem_anchors(anchor_indices, Q)
 
 
 def eval_xref(xref_attr):
@@ -45,46 +59,43 @@ def eval_xref(xref_attr):
     return tp, fp, tn, fn
 
 
-Ks = [20, 50, 100]
-DocTs = [100, 10, 5]
-TheTs = [.1, .2, .3, .4, .5]
+Ks = [1000, 2000, 3000, 4000]
+ThetaTs = [.1, .2, .5]
 algos = [
-    ('vari', ankura.topic.variational_assign),
-    ('mod2', ankura.topic.mode_assign2),
-    ('modi', ankura.topic.mode_init_assign),
+    ('vari', ankura.assign.variational),
+    ('icmw', ankura.assign.mode_word_init),
 ]
 
-for k, doc_t, theta_t, (algo, assign) in itertools.product(Ks, DocTs, TheTs, algos):
+for seed, k, theta_t, (algo, assign) in itertools.product(seeds, Ks, ThetaTs, algos):
     task_no += 1
     if task_no % num_nodes != node_num:
         continue
 
-    topics = ankura.anchor.anchor_algorithm(bible, k, doc_t)
-    theta_attr = '{}_{}_{}_theta'.format(algo, k, doc_t)
-    z_attr = '{}_{}_{}_z'.format(algo, k, doc_t)
+    np.random.seed(seed)
+    sample = np.random.choice(len(bible.documents), size=1000, replace=False)
+
+    # anchors = ankura.anchor.gram_schmidt_anchors(bible, Q, k, doc_threshold=5)
+    anchors = rp_anchors(k)
+    topics = ankura.anchor.recover_topics(Q, anchors)
+
+    theta_attr = '{}_{}_theta'.format(algo, k)
+    z_attr = '{}_{}_z'.format(algo, k)
     assign(bible, topics, theta_attr, z_attr)
 
-    xref_attr  = '{}_{}_{}_xrefs{}'.format(algo, k, doc_t, theta_t)
+    xref_attr  = '{}_{}_xrefs{}'.format(algo, k, theta_t)
     ankura.topic.cross_reference(bible, theta_attr, xref_attr, 'verse', threshold=theta_t, doc_ids=sample)
     tp, fp, tn, fn = eval_xref(xref_attr)
 
-    switch = ankura.validate.topic_switch_percent(bible, attr=z_attr)
+    writer.writerow({
+        'algo': algo,
+        'k': k,
+        'thet': theta_t,
 
-    try:
-        writer.writerow({
-            'algo': algo,
-            'k': int(k),
-            'doct': doc_t,
-            'thet': theta_t,
-            'f1': 2 * tp / (2 * tp + fn + fp),
-            'precision': tp / (tp+fp),
-            'recall': tp / (tp+fn),
-            'specificity': tn / (tn+fp),
-        })
-    except:
-        writer.writerow({
-            'algo': algo,
-            'k': int(k),
-            'doct': doc_t,
-            'thet': theta_t,
-        })
+        'f1': 2 * tp / (2 * tp + fn + fp),
+        'precision': tp / (tp+fp),
+        'recall': tp / (tp+fn),
+        'specificity': tn / (tn+fp),
+
+        'consistency': ankura.validate.consistency(bible, z_attr),
+        'significance': np.mean([ankura.validate.significance_dback(t, bible, theta_attr) for t in range(k)]),
+    })

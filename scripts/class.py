@@ -14,7 +14,7 @@ node_num = int(os.environ.get('PSSH_NODENUM', '0'))
 num_nodes = int(os.environ.get('PSSH_NUMNODES', '1'))
 
 np.random.seed(314159268)
-seeds = [int(np.random.random() * (2*32-1)) for _ in range(1)]
+seeds = [int(np.random.random() * (2**32-1)) for _ in range(1)]
 
 corpora = [
     (lambda : ankura.corpus.newsgroups(), 40, 'newsgroup'),
