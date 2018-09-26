@@ -16,12 +16,14 @@ will point at a GitHub repo designed for use with
 import functools
 import itertools
 import os
+import string
 import urllib.request
 
 from . import pipeline
 import posixpath
 
-download_dir = os.path.join(os.getenv('HOME'), '.ankura')
+# download_dir = os.path.join(os.getenv('HOME'), '.ankura')
+download_dir = '/local/jlund3/ankura'
 
 def _path(name, *opts):
     if opts:
@@ -76,18 +78,21 @@ def download_inputer(*names):
     return _inputer
 
 
-def bible(remove_stopwords=True, remove_empty=False, use_stemmer=False):
-    """Gets a Corpus containing the King James version of the Bible with over
-    250,000 cross references.
+def bible(version='esv', remove_stopwords=True, remove_empty=False, use_stemmer=False):
+    """Gets a Corpus containing the the Holy Bible with cross references.
 
+    The translation used can be selected with version (default: 'esv').
+    Available options include 'esv' and 'kjv'.
     If remove_stopwords is True (default: True), then stopwords, both modern
     and Jacobean will be pruned from the corpus vocabulary.
     If remove_empty is True (default: False), then words which appear in 0 or 1
     documents will be removed, and any empty documents will be removed.
-    If use_stemmer is True (default False), then each token will be stemmed
+    If use_stemmer is True (default: False), then each token will be stemmed
     using the Porter stemming algorithm.
     """
-    tokenizer = pipeline.default_tokenizer()
+    tokenizer = pipeline.translate_tokenizer(
+        pipeline.split_tokenizer(string.whitespace + '—'),
+    )
     if remove_stopwords:
         tokenizer = pipeline.stopword_tokenizer(
             tokenizer,
@@ -99,24 +104,38 @@ def bible(remove_stopwords=True, remove_empty=False, use_stemmer=False):
     if use_stemmer:
         tokenizer = pipeline.stemming_tokenizer(tokenizer)
 
+    def _xref_labeler(name):
+        return pipeline.list_labeler(
+            open_download('bible/xref-{}.txt'.format(name)),
+            'xref-{}'.format(name),
+        )
+
     p = pipeline.Pipeline(
-        download_inputer('bible/bible.txt'),
-        pipeline.line_extractor(),
+        download_inputer('bible/{}.txt'.format(version)),
+        pipeline.line_extractor('\t'),
         tokenizer,
         pipeline.composite_labeler(
             pipeline.title_labeler('verse'),
-            pipeline.list_labeler(
-                open_download('bible/xref.txt'),
-                'xref',
-            ),
+            _xref_labeler('tske'),
+            _xref_labeler('obib'),
+            *[_xref_labeler('obib{}'.format(i)) for i in range(11)],
         ),
         pipeline.keep_filterer(),
-        pipeline.kwargs_informer(name='bible'),
+        pipeline.composite_informer(
+            pipeline.title_informer('verses', 'verse'),
+            pipeline.kwargs_informer(
+                name='Holy Bible',
+                version=version,
+                remove_stopwords=remove_stopwords,
+                remove_empty=remove_empty,
+                use_stemmer=use_stemmer,
+            ),
+        )
     )
 
     if remove_empty:
         p.tokenizer = pipeline.frequency_tokenizer(p, 2)
-    bible = p.run(_path('bible.pickle',
+    bible = p.run(_path('bible_{}.pickle'.format(version),
         remove_stopwords,
         remove_empty,
         use_stemmer,
