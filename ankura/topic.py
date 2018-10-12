@@ -52,35 +52,58 @@ def highlight(doc, z_attr, highlighter=lambda w, z: '{}:{}'.format(w, z)):
     return ''.join(chunks)
 
 
-def cross_reference(corpus, theta_attr, xref_attr, title_attr=None,
-        n=sys.maxsize, threshold=1, doc_ids=None):
+# TODO Add distance metrics
+# TODO Add all references as tuple
+def cross_reference(corpus, theta_attr, xref_attr,
+        doc_ids=None,
+        title_attr=None,
+        n=sys.maxsize, threshold=1,
+        distance='cosine',
+        booleanize=False):
     """Finds the nearest documents by topic similarity.
 
     The documents of the corpus must include a metadata value for theta_attr
     giving a vector representation of the document. Typically, this is a topic
     distribution obtained with assign_topics. The vector representation is then
-    used to compute distances between documents.
+    used to compute distances between documents. Optionally, cross referencing
+    can be computed for just the documents referenced by doc_ids (can be
+    iterable for multiple document ids or an int for one document id).
 
     For the purpose of choosing cross references, the closest n documents will
-    be considered (default=sys.maxsize), although Documents whose similarity is
-    behond the threshold (default=1) are excluded.  A threshold of 1 indicates
-    that no filtering should be done, while a 0 indicates that only exact
-    matches should be returned. The resulting cross references are stored on
-    each document of the Corpus under the xref_attr.
+    be considered (default=sys.maxsize), although Documents whose distance is
+    behond the threshold (default=1) are excluded. The resulting cross
+    references are stored on each Document of the Corpus under the xref_attr.
+    If the title_attr is given, that attribute of the document is stored
+    instead of the Document itself.
+
+    Finally, the way distance is computed can be specified using the distance
+    parameter (default='cosine'). This can be the name of a distance metric
+    supported by scipy.spatial.distance.cdist, or a function which takes two
+    topic vectors as input.
     """
-    if doc_ids is None:
-        doc_ids = range(len(corpus.documents))
+    try:
+        # make sure doc_ids is iterable
+        doc_ids = (d for d in doc_ids)
+    except TypeError:
+        if doc_ids is None:
+            # default to using all docs
+            doc_ids = range(len(corpus.documents))
+        else:
+            # otherwise, assume docs is a single doc id
+            doc_ids = [docs]
+
+    thetas = np.array([doc.metadata[theta_attr] for doc in corpus.documents])
+    if booleanize:
+        thetas = (thetas != 0).astype(int)
+
     for d in doc_ids:
-        doc = corpus.documents[d]
-        doc_theta = doc.metadata[theta_attr]
-        dists = [spatial.distance.cosine(doc_theta, d.metadata[theta_attr])
-                 if doc is not d else float('nan')
-                 for d in corpus.documents]
-        dists = np.array(dists)
-        xrefs = [corpus.documents[i] for i in dists.argsort()[:n] if dists[i] <= threshold]
+        dists = spatial.distance.cdist(thetas[d, None], thetas, distance)[0]
+        xrefs = dists.argsort()[:n+1] # +1 to account for d being in the list
+        xrefs = [i for i in xrefs if dists[i] <= threshold and i != d]
+        xrefs = [corpus.documents[i] for i in xrefs]
         if title_attr:
             xrefs = [doc.metadata[title_attr] for doc in xrefs]
-        doc.metadata[xref_attr] = xrefs
+        corpus.documents[d].metadata[xref_attr] = xrefs
 
 
 def classifier(train, topics, label_attr='label', z_attr='z', alpha=.01):

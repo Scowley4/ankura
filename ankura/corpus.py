@@ -22,8 +22,7 @@ import urllib.request
 from . import pipeline
 import posixpath
 
-# download_dir = os.path.join(os.getenv('HOME'), '.ankura')
-download_dir = '/local/jlund3/ankura'
+download_dir = os.path.join(os.getenv('HOME'), '.ankura')
 
 def _path(name, *opts):
     if opts:
@@ -96,10 +95,7 @@ def bible(version='esv', remove_stopwords=True, remove_empty=False, use_stemmer=
     if remove_stopwords:
         tokenizer = pipeline.stopword_tokenizer(
             tokenizer,
-            itertools.chain(
-                open_download('stopwords/english.txt'),
-                open_download('stopwords/jacobean.txt'),
-            ),
+            open_download('stopwords/nltk.txt'),
         )
     if use_stemmer:
         tokenizer = pipeline.stemming_tokenizer(tokenizer)
@@ -140,7 +136,7 @@ def bible(version='esv', remove_stopwords=True, remove_empty=False, use_stemmer=
         remove_empty,
         use_stemmer,
     ))
-    if remove_empty:
+    if remove_empty: # frequency_tokenizer may remove last word of a doc
         bible = pipeline.select_docs(bible, lambda d: d.tokens)
 
     return bible
