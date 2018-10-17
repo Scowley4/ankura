@@ -1,78 +1,42 @@
 import glob
-import sys
-import csv
-import itertools
-import os
-import pickle
-
-import numpy as np
-import scipy.spatial
 
 import ankura
+import psshlib
 
-task_no = -1
-node_num = int(os.environ.get('PSSH_NODENUM', '0'))
-num_nodes = int(os.environ.get('PSSH_NUMNODES', '1'))
+bible = ankura.corpus.bible(remove_stopwords=True, remove_empty=False, use_stemmer=True)
+# datasets = ['tske', 'obib'] + ['obib{}'.format(i) for i in range(11)]
+datasets = ['tske', 'obib0', 'obib5']
+fnames = glob.glob('aml/scratch/xrefs/*.txt')
 
-D = len(ankura.corpus.bible(remove_stopwords=False, remove_empty=False, use_stemmer=True).documents)
-sample = np.random.choice(D, size=D, replace=False)
-golds = ['tske', 'obib'] + ['obib{}'.format(i) for i in range(11)]
+for dataset, fname in psshlib.pproduct(datasets, fnames):
+    dataset_xref = 'xref-{}'.format(dataset)
+    gold = set()
+    for doc in bible.documents:
+        verse = doc.metadata['verse']
+        for ref in doc.metadata[dataset_xref]:
+            gold.add((verse, ref))
 
-writer = csv.DictWriter(sys.stdout, ['eval','tp','fp', 'tn', 'fn', 'tpr', 'tnr', 'ppv', 'acc', 'f1', 'fpr'])
-writer.writeheader()
+    with open(fname.replace('xrefs', 'evals').replace('.txt', '_{}.csv'.format(dataset)), 'w') as f:
+        f.write('tp,fp,fn,tn\n')
 
-def eval_xref(bible, gold_attr, pred_attr):
-    tp = 0
-    fp = 0
-    fn = 0
+        a, b = 1, 2
 
-    for d in sample:
-        verse = bible.documents[d]
-        gold = set(verse.metadata[gold_attr])
-        pred = set(verse.metadata[pred_attr])
+        tp = 0
+        fp = 0
+        fn = len(gold)
+        tn = len(bible.documents) * (len(bible.documents) - 1) - fn
 
-        tp += len(pred.intersection(gold))
-        fp += len(pred.difference(gold))
-        fn += len(gold.difference(pred))
+        for i, line in enumerate(open(fname)):
+            ref = tuple(line.split())
+            if ref in gold:
+                tp += 1
+                fn -= 1
+            else:
+                fp += 1
+                tn -= 1
 
-    tn = len(sample) * (len(bible.documents) - 1) - tp - fp - fn
-    return tp, fp, tn, fn
+            if i == a:
+                f.write('{},{},{},{}\n'.format(tp,fp,fn,tn))
+                a, b = b, a+b
 
-ts = [.91, .92, .93, .94, .95, .96, .97, .98, .99]
-fnames = glob.glob('/users/scratch/jlund3/bibles/*.pickle')
-distances = [
-    ('cosine', False),
-    # ('euclidean', False),
-    # ('sqeuclidean', False),
-    # ('chebyshev', False),
-]
-
-for t, fname, (dist, booleanize) in itertools.product(ts, fnames, distances):
-    task_no += 1
-    if task_no % num_nodes != node_num:
-        continue
-
-    name = os.path.basename(fname)[:-7]
-    t_attr = name + '_theta'
-
-    anchors, topics, bible = pickle.load(open(fname, 'rb'))
-
-    x_attr = '{}_{}_{}_xref'.format(name, t, dist)
-    ankura.topic.cross_reference(bible, t_attr, x_attr, sample, 'verse',
-            threshold=t, distance=dist, booleanize=booleanize)
-
-    for gold in golds:
-        tp, fp, tn, fn = eval_xref(bible, 'xref-{}'.format(gold), x_attr)
-        writer.writerow({
-            'eval': '{} {}'.format(x_attr, gold),
-            'tp': tp,
-            'fp': fp,
-            'tn': tn,
-            'fn': fn,
-            'tpr': tp/(tp+fn),
-            'tnr': tn/(tn+fp),
-            'ppv': tp/(tp+fp),
-            'acc': (tp+tn)/(tp+tn+fp+fn),
-            'f1': 2*tp/(2*tp+tp+fn),
-            'fpr': fp/(fp+tn)
-        })
+        f.write('{},{},{},{}\n'.format(tp,fp,fn,tn))
