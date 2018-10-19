@@ -176,7 +176,8 @@ def tandem_anchors(anchors, Q, corpus=None, epsilon=1e-10):
 
 
 @util.jit
-def _exponentiated_gradient(Y, X, XX, epsilon):
+def exponentiated_gradient(Y, X, XX, epsilon):
+    """Helper for recover_topics. Exposed only for multiprocessing purposes."""
     _C1 = 1e-4
     _C2 = .75
 
@@ -292,7 +293,7 @@ def recover_topics(Q, anchors, epsilon=2e-6):
     # Represent each word as a convex combination of anchors.
     C = np.zeros((V, K))
     for word in range(V):
-        C[word] = _exponentiated_gradient(Q[word], X, XX, epsilon)
+        C[word] = exponentiated_gradient(Q[word], X, XX, epsilon)
 
     # Use Bayes rule to compute topic matrix
     A = np.dot(P_w, C)

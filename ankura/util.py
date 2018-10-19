@@ -1,9 +1,11 @@
 """A collection of utility functions used throughout Ankura"""
 
-import numpy as np
-import pickle
+import errno
 import functools
 import os
+import pickle
+
+import numpy as np
 
 try:
     import numba
@@ -62,17 +64,13 @@ def random_projection(A, k):
     return np.dot(A, R * np.sqrt(3))
 
 
-class memoize(object):
-    """Decorator for memoizing a function."""
-
-    def __init__(self, func):
-        self.func = func
-        self.cache = {}
-
-    def __call__(self, *args):
-        if args not in self.cache:
-            self.cache[args] = self.func(*args)
-        return self.cache[args]
+def ensure_dir(path):
+    """Ensures that a directory exists, creating it if it doesn't."""
+    try:
+        os.makedirs(path)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
 
 
 def pickle_cache(pickle_path):
