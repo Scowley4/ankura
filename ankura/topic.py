@@ -3,7 +3,7 @@
 import sys
 
 import numpy as np
-from scipy import sparse
+from scipy import spatial, sparse
 import sklearn.naive_bayes
 
 from . import util
@@ -71,3 +71,14 @@ def _sparse_topic_word(corpus, K, V, z_attr):
         for w, z in zip(doc.tokens, doc.metadata[z_attr]):
             data[d, w.token + z*V] += 1
     return data
+
+
+def pdists(corpus, theta_attr, metric='cosine'):
+    D = len(corpus.documents)
+    thetas = np.array([doc.metadata[theta_attr] for doc in corpus.documents])
+    dists = spatial.distance.pdist(thetas, metric)
+    for ij in np.argsort(dists, axis=None):
+        i, j = ij // D, ij % D
+        if i == j:
+            continue
+        yield i, j
