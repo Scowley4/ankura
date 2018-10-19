@@ -504,6 +504,48 @@ class VocabBuilder(object):
         return [TokenLoc(self[t.token], t.loc) for t in tokens]
 
 
+class DocumentStream(object):
+    """A file-backed list of documents for Corpus that are too big for RAM."""
+
+    def __init__(self, filename):
+        self._path = filename
+        self._offsets = [0]
+        self._file = open(self._path, 'wb')
+
+    def append(self, doc):
+        if not self._file or not self._file.writable():
+            self._file = open(self._path, 'ab')
+
+        obj = pickle.dumps(doc)
+        self._offsets.append(self._offsets[-1] + len(obj))
+        self._file.write(obj)
+
+    def __getitem__(self, i):
+        if not self._file or not self._file.readable():
+            self._file = open(self._path, 'rb')
+
+        self._file.seek(self._offsets[i])
+        return pickle.load(self._file)
+
+    def __iter__(self):
+        if self._file:
+            self._file.flush()
+
+        with open(self._path, 'rb') as f:
+            for _ in range(len(self)):
+                yield pickle.load(u)
+
+    def __len__(self):
+        return len(self._offsets) - 1
+
+    def __getstate__(self):
+        return (self._path, self._offsets)
+
+    def __setstate(self, state):
+        self._path, self._offsets = state
+        self._file = None
+
+
 class Pipeline(object):
     """Pipeline describes the process of importing a Corpus"""
 
@@ -515,12 +557,12 @@ class Pipeline(object):
         self.filterer = filterer
         self.informer = informer
 
-    def run(self, pickle_path=None):
+    def run(self, pickle_path=None, docs_path=None):
         """Creates a new Corpus using the Pipeline"""
         if pickle_path and os.path.exists(pickle_path):
             return pickle.load(open(pickle_path, 'rb'))
 
-        documents = []
+        documents = DocumentStream(docs_path) if docs_path else []
         vocab = VocabBuilder()
         for docfile in self.inputer():
             for text in self.extractor(docfile):
