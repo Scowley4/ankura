@@ -34,9 +34,8 @@ class TopicRecover(mrs.MapReduce):
     def input_data(self, job):
         Q, anchors = self.get_qank()
         V = Q.shape[0]
-        n = 21
-        tasks = ((i, range(i, V, n)) for i in range(n))
-        return job.local_data(tasks)
+        n = self.opts.num_tasks
+        return job.local_data(((i, range(i, V, n)) for i in range(n)))
 
     def run(self, job):
         batches = self.input_data(job)
@@ -86,6 +85,14 @@ class TopicRecover(mrs.MapReduce):
         for k in range(K):
             A[:, k] = A[:, k] / A[:, k].sum()
         yield C.dumps()
+
+    @classmethod
+    def update_parser(cls, parser):
+        parser.add_option('-t', '--tasks',
+            dest='num_tasks', type=int,
+            help='Number of map tasks to use',
+            default=20)
+        return parser
 
 
 if __name__ == '__main__':

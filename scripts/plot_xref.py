@@ -72,7 +72,7 @@ def cost_mod():
 
     plt.tight_layout()
     plt.show()
-cost_mod()
+# cost_mod()
 
 
 def prc_mod():
