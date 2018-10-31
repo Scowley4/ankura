@@ -1,8 +1,5 @@
 import os
 import pickle
-import sys
-import tempfile
-import itertools
 import functools
 
 import numpy as np
@@ -35,7 +32,7 @@ class TopicRecover(mrs.MapReduce):
         Q, anchors = self.get_qank()
         V = Q.shape[0]
         n = self.opts.num_tasks
-        return job.local_data(((i, range(i, V, n)) for i in range(n)))
+        return job.local_data((i, range(i, V, n)) for i in range(n))
 
     def run(self, job):
         batches = self.input_data(job)
