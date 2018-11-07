@@ -533,7 +533,7 @@ class DocumentStream(object):
 
         with open(self._path, 'rb') as f:
             for _ in range(len(self)):
-                yield pickle.load(u)
+                yield pickle.load(f)
 
     def __len__(self):
         return len(self._offsets) - 1
@@ -541,7 +541,7 @@ class DocumentStream(object):
     def __getstate__(self):
         return (self._path, self._offsets)
 
-    def __setstate(self, state):
+    def __setstate__(self, state):
         self._path, self._offsets = state
         self._file = None
 

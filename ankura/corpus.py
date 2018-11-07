@@ -13,6 +13,7 @@ in the path given by `download_dir`, and data will be downloaded from
 `base_url`. By default, `download_dir` will be '$HOME/.ankura' while base_url
 will point at a GitHub repo designed for use with
 """
+import json
 import functools
 import itertools
 import os
@@ -244,6 +245,32 @@ def amazon(rare_threshold=50):
     if rare_threshold:
         p.tokenizer = pipeline.frequency_tokenizer(p, rare_threshold)
     return p.run(_path('amazon.pickle', rare_threshold))
+
+
+def amazon_large():
+    class popiter(list):
+        def __iter__(self):
+            while self:
+                yield self.pop()
+    label_stream = popiter()
+
+    def hingidy_jingidies(docfile, value_key='reviewText', label_key='overall'):
+        for i, line in enumerate(docfile):
+            if i == 1000000:
+                break
+            line = json.loads(line.decode('utf-8'))
+            label_stream.append((str(i), line[label_key]))
+            yield pipeline.Text(str(i), line[value_key])
+
+    p = pipeline.Pipeline(
+        pipeline.file_inputer('/users/data/amazon_large/item_dedup.json.gz'),
+        pipeline.gzip_extractor(hingidy_jingidies),
+        pipeline.default_tokenizer(),
+        pipeline.stream_labeler(label_stream),
+        pipeline.length_filterer(),
+    )
+    p.tokenizer = pipeline.frequency_tokenizer(p, 200, 100000)
+    return p.run(_path('amazon_large.pickle'), _path('amazon_large.docs'))
 
 
 def tripadvisor():
