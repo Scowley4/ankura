@@ -10,7 +10,7 @@ import mrs
 
 class ConstructQ(mrs.MapReduce):
 
-    functools.lru_cache()
+    @functools.lru_cache()
     def get_corpus(self):
         if len(self.args) != 2:
             print("Requires input and an output.", file=sys.stderr)
