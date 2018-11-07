@@ -2,6 +2,7 @@ import functools
 import sys
 import pickle
 
+import scipy.sparse
 import numpy as np
 
 import ankura
@@ -35,7 +36,8 @@ class ConstructQ(mrs.MapReduce):
 
         for _, Q in output.data():
             with open(self.args[1], 'wb') as f:
-                pickle.dump(np.loads(Q), f)
+                pickle.dump(np.loads(Q), f, protocol=4)
+        return 0
 
     @mrs.output_serializers(key=mrs.str_serializer, value=mrs.raw_serializer)
     def map(self, key, batch):
@@ -56,7 +58,7 @@ class ConstructQ(mrs.MapReduce):
                         continue
                     Q[w_i.token, w_j.token] += norm
 
-        yield '', Q.dumps()
+        yield '', pickle.dumps(scipy.sparse.coo_matrix(Q))
 
     @mrs.output_serializers(key=mrs.str_serializer, value=mrs.raw_serializer)
     def reduce(self, key, values):
@@ -65,7 +67,7 @@ class ConstructQ(mrs.MapReduce):
         Q = np.zeros((V, V))
 
         for Q_part in values:
-            Q += np.loads(Q_part)
+            Q += pickle.loads(Q_part)
         Q /= Q.sum()
 
         yield Q.dumps()

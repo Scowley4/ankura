@@ -20,11 +20,12 @@ class TopicRecover(mrs.MapReduce):
 
         bible = ankura.corpus.bible(remove_stopwords=True, remove_empty=False, use_stemmer=True)
         Q = ankura.anchor.build_cooccurrence(bible)
-        anchors = ankura.anchor.gram_schmidt_anchors(bible, Q, 3000, doc_threshold=5)
+        # anchors = ankura.anchor.gram_schmidt_anchors(bible, Q, 3000, doc_threshold=5)
+        anchors = ankura.anchor.gram_schmidt_anchors(bible, Q, 100, doc_threshold=100)
 
         ankura.util.ensure_dir(self.output_dir())
         with open(pickle_path, 'wb') as f:
-            pickle.dump((Q, anchors), f)
+            pickle.dump((Q, anchors), f, protocol=4) # protocol 4 needed to dump more than 4GB
 
         return Q, anchors
 
