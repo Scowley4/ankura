@@ -384,7 +384,7 @@ def list_labeler(data, attr='label', delim='\t', sep=','):
     list of string retrieved by spliting on a separator.
     """
     stream = (line.rstrip(os.linesep).split(delim, 1) for line in data)
-    stream = ((key, value.split(sep)) for key, value in stream)
+    stream = ((key, value.split(sep) if value else []) for key, value in stream)
     return stream_labeler(stream, attr)
 
 
