@@ -19,6 +19,7 @@ import itertools
 import os
 import string
 import urllib.request
+import re
 
 from . import pipeline
 import posixpath
@@ -365,3 +366,45 @@ def nyt(rare_threshold=150):
     if rare_threshold:
         p.tokenizer = pipeline.frequency_tokenizer(p, rare_threshold)
     return p.run(_path('nyt.pickle', rare_threshold))
+
+
+def beowulf(remove_stopwords=True, use_stemmer=False):
+    """Imports the Heaney translation of Beowulf.
+    """
+    def poetry_extractor(docfile):
+        for lineno, line in enumerate(docfile):
+            yield pipeline.Text(lineno, line.decode('utf-8', 'strict').strip())
+    def keepalpha_tokenizer(base_tokenizer):
+        pattern = re.compile('[\W]+')
+        modify = lambda t: pattern.sub('', t.lower())
+        def _tokenizer(data):
+            tokens = [pipeline.TokenLoc(modify(t.token), t.loc) for t in base_tokenizer(data)]
+            return [t for t in tokens if t.token]
+        return _tokenizer
+
+    tokenizer = keepalpha_tokenizer(pipeline.split_tokenizer())
+    if remove_stopwords:
+        tokenizer = pipeline.stopword_tokenizer(
+            tokenizer,
+            open_download('stopwords/nltk.txt'),
+        )
+    if use_stemmer:
+        tokenizer = pipeline.stemming_tokenizer(tokenizer)
+
+    p = pipeline.Pipeline(
+        download_inputer('beowulf/heaney.txt'),
+        poetry_extractor,
+        tokenizer,
+        pipeline.title_labeler('lineno'),
+        pipeline.keep_filterer(),
+        pipeline.kwargs_informer(
+            name='Beowulf',
+            remove_stopwords=remove_stopwords,
+            use_stemmer=use_stemmer,
+        ),
+    )
+
+    return p.run(_path('beowulf.pickle',
+        remove_stopwords,
+        use_stemmer,
+    ))
