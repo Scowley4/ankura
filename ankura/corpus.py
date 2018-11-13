@@ -447,6 +447,31 @@ def artofwar(remove_stopwords=True, use_stemmer=False):
     ))
 
 
+def ulysses(remove_stopwords=True, use_stemmer=False):
+    """Gets a Corpus containing Ulysses by James Joyce."""
+    return _gutenberg_import('ulysses', remove_stopwords, use_stemmer)
+
+
+def plato(remove_stopwords=True, use_stemmer=False):
+    """Gets a Corpus containing the works of Plato."""
+    return _gutenberg_import('plato', remove_stopwords, use_stemmer)
+
+
+def _gutenberg_import(name, remove_stopwords, use_stemmer):
+    p = pipeline.Pipeline(
+        download_inputer(f'{name}/{name}.tar.gz'),
+        pipeline.targz_extractor(pipeline.split_extractor(delim='\r\n\r\n')),
+        _complete_tokenizer(pipeline.default_tokenizer(), remove_stopwords, use_stemmer),
+        pipeline.title_labeler('id'),
+        pipeline.length_filterer(),
+    )
+    p.tokenizer = pipeline.frequency_tokenizer(p)
+    return p.run(_path(f'{name}.pickle',
+        remove_stopwords,
+        use_stemmer,
+    ))
+
+
 def _complete_tokenizer(tokenizer, remove_stopwords, use_stemmer):
     if remove_stopwords:
         tokenizer = pipeline.stopword_tokenizer(
