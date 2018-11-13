@@ -413,8 +413,13 @@ def artofwar(remove_stopwords=True, use_stemmer=False):
     """Imports the sunzisaid translation of Sunzi's Art of War (孙子兵法)
     """
 
-    tokenizer = pipeline.replace_tokenizer(pipeline.default_tokenizer(),
-                                           delim='---')
+    def replace_pretokenizer(base_tokenizer, find='---', repl=' '):
+        def _tokenizer(data):
+            return base_tokenizer(data.replace(find, repl))
+        return _tokenizer
+:wa
+
+    tokenizer = replace_pretokenizer(pipeline.default_tokenizer())
 
     def artofwar_extractor(docfile):
         chapter = None
