@@ -166,6 +166,17 @@ def split_tokenizer(delims=string.whitespace):
     return _tokenizer
 
 
+def replace_tokenizer(base_tokenizer, delim, repl=' '):
+    """Wraps another tokenizer, replacing all instances of delim in the
+    data with repl.
+    """
+    def _tokenizer(data):
+        new_data = data.replace(delim, repl)
+        tokens = base_tokenizer(new_data)
+        return tokens
+    return _tokenizer
+
+
 _LOWER_DELPUNCT_TABLE = str.maketrans(string.ascii_letters,
                                       string.ascii_lowercase * 2,
                                       string.punctuation)
