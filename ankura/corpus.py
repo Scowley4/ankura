@@ -408,3 +408,52 @@ def beowulf(remove_stopwords=True, use_stemmer=False):
         remove_stopwords,
         use_stemmer,
     ))
+
+def artofwar(remove_stopwords=True, use_stemmer=False):
+    """Imports the sunzisaid translation of Sunzi's Art of War (孙子兵法)
+    """
+
+    tokenizer = pipeline.split_tokenizer()
+
+    def artofwar_extractor(docfile):
+        chapter = None
+        num_re = re.compile(r'\d+')
+
+        for line in docfile:
+            line = line.decode('utf-8', 'strict')
+
+            # Skip blank lines
+            if not line.strip():
+                continue
+
+            # Extract the chapter
+            if line.startswith('CHAPTER'):
+                chapter = int(num_re.findall(line)[0])
+                continue
+
+            # Skip lines before the first chapter
+            if chapter is None:
+                continue
+
+            verse, text = line.split('.', 1)
+            yield pipeline.Text(f'{chapter}:{verse}', text.strip())
+
+    # inputer, extractor, tokenizer, labler, filterer, informer=None
+    p = pipeline.Pipeline(
+          download_inputer('artofwar/sunzisaid.txt'),
+          artofwar_extractor,
+          tokenizer,
+          pipeline.title_labeler('verse'),
+          pipeline.keep_filterer(),
+          pipeline.kwargs_informer(
+              name='ArtOfWar',
+              remove_stopwords=remove_stopwords,
+              use_stemmer=use_stemmer,
+          ),
+    )
+
+
+    return p.run(_path('artofwar.pickle',
+        remove_stopwords,
+        use_stemmer,
+    ))
