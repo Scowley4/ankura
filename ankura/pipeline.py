@@ -85,7 +85,7 @@ def split_extractor(delim='\n\n', encoding='utf-8', errors='strict'):
     def _extractor(docfile):
         data = docfile.read().decode(encoding, errors).split(delim)
         for i, datum in enumerate(data):
-            yield Text(f'{docfile_name}_{i}', datum.strip())
+            yield Text(f'{docfile.name}_{i}', datum.strip())
     return _extractor
 
 

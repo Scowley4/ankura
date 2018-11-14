@@ -105,7 +105,7 @@ def bible(version='esv', remove_stopwords=True, remove_empty=False, use_stemmer=
             _xref_labeler('obib'),
             *[_xref_labeler('obib{}'.format(i)) for i in range(11)],
         ),
-        pipeline.keep_filterer(),
+        _get_filterer(remove_empty),
         pipeline.composite_informer(
             pipeline.title_informer('verses', 'verse'),
             pipeline.kwargs_informer(
@@ -119,14 +119,13 @@ def bible(version='esv', remove_stopwords=True, remove_empty=False, use_stemmer=
     )
 
     if remove_empty:
-        p.tokenizer = pipeline.frequency_tokenizer(p, 2)
+        p.tokenizer = pipeline.frequency_tokenizer(p, 1)
+
     bible = p.run(_path('bible_{}.pickle'.format(version),
         remove_stopwords,
         remove_empty,
         use_stemmer,
     ))
-    if remove_empty: # frequency_tokenizer may remove last word of a doc
-        bible = pipeline.select_docs(bible, lambda d: d.tokens)
 
     return bible
 
@@ -447,26 +446,17 @@ def artofwar(remove_stopwords=True, use_stemmer=False):
     ))
 
 
-def ulysses(remove_stopwords=True, use_stemmer=False):
+def ulysses(remove_stopwords=True, use_stemmer=False, remove_empty=False):
     """Gets a Corpus containing Ulysses by James Joyce."""
-    return _gutenberg_import('ulysses', remove_stopwords, use_stemmer)
-
-
-def plato(remove_stopwords=True, use_stemmer=False):
-    """Gets a Corpus containing the works of Plato."""
-    return _gutenberg_import('plato', remove_stopwords, use_stemmer)
-
-
-def _gutenberg_import(name, remove_stopwords, use_stemmer):
     p = pipeline.Pipeline(
-        download_inputer(f'{name}/{name}.tar.gz'),
-        pipeline.targz_extractor(pipeline.split_extractor(delim='\r\n\r\n')),
+        download_inputer(f'ulysses/ulysses.tar.gz'),
+        pipeline.targz_extractor(pipeline.split_extractor(delim='\r\n\r\n', encoding='ascii', errors='ignore')),
         _complete_tokenizer(pipeline.default_tokenizer(), remove_stopwords, use_stemmer),
         pipeline.title_labeler('id'),
         pipeline.length_filterer(),
     )
     p.tokenizer = pipeline.frequency_tokenizer(p)
-    return p.run(_path(f'{name}.pickle',
+    return p.run(_path(f'ulysses.pickle',
         remove_stopwords,
         use_stemmer,
     ))
@@ -481,3 +471,9 @@ def _complete_tokenizer(tokenizer, remove_stopwords, use_stemmer):
     if use_stemmer:
         tokenizer = pipeline.stemming_tokenizer(tokenizer)
     return tokenizer
+
+
+def _get_filterer(remove_empty):
+    if remove_empty:
+        return pipeline.length_filterer()
+    return pipeline.keep_filterer()
