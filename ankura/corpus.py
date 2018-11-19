@@ -477,3 +477,18 @@ def _get_filterer(remove_empty):
     if remove_empty:
         return pipeline.length_filterer()
     return pipeline.keep_filterer()
+
+
+def montecristo(remove_stopwords=True, use_stemmer=False):
+    """Gets a Corpus containing the text of the Count of Monte Cristo."""
+    p = pipeline.Pipeline(
+        download_inputer('montecristo/montecristo.txt'),
+        pipeline.split_extractor(),
+        _complete_tokenizer(pipeline.default_tokenizer(), remove_stopwords, use_stemmer),
+        pipeline.noop_labeler(),
+        pipeline.keep_filterer(),
+    )
+    return p.run(_path('montecristo.pickle',
+        remove_stopwords,
+        use_stemmer,
+    ))
