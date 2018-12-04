@@ -94,7 +94,7 @@ def download_inputer(*names):
 
 def tripadvisor():
     """Gets a corpus containing hotel reviews on trip advisor with ~240,000 documents"""
-    #These words should be removed, as they don't en up cooccuring with other
+    # These words should be removed, as they don't end up cooccuring with other
     # words
     extra_stopwords = ['zentral', 'jederzeit', 'gerne', 'gutes', 'preis',
     'plac茅', 'empfehlenswert', 'preisleistungsverh盲ltnis', 'posizione',
@@ -334,6 +334,43 @@ def amazon():
     )
     p.tokenizer = pipeline.frequency_tokenizer(p, 50)
     return p.run(_path('amazon.pickle'))
+
+def congress():
+    """Corpus on congress talking about different issues/bills."""
+    def congress_labeler(title):
+        # See .ankura/congress.README.v1.1.txt for more info
+        # ###_@@@@@@_%%%%$$$_PMV
+        # P - party (D, R, or X)
+        # V - vote indicator
+        return {'title': title,
+                'party': title[19],
+                'vote' : title[21]}
+
+    def party_filterer():
+        """Remove docs with Independent speakers (26 docs before other filters)"""
+        accepted = {'D', 'R'}
+        def _filterer(doc):
+            return doc.metadata['party'] in accepted
+        return _filterer
+
+    p = pipeline.Pipeline(
+        download_inputer('congress/congress.tar.gz'),
+        pipeline.targz_extractor(
+            pipeline.whole_extractor()
+        ),
+        pipeline.stopword_tokenizer(
+                pipeline.default_tokenizer(),
+                open_download('stopwords/english.txt'),
+        ),
+        congress_labeler,
+        pipeline.composite_filterer(
+            pipeline.length_filterer(100),
+            party_filterer()
+        )
+    )
+    p.tokenizer = pipeline.frequency_tokenizer(p, 50)
+    return p.run(_path('congress.pickle'))
+
 
 class BufferedStream(object):
 
