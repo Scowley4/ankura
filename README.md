@@ -12,3 +12,4 @@ provide any support.
 * master - token level topic assignment experiments
 * ankura2 - scalable topic based classification
 * acl17 - interactive topic modeling with tandem anchoring
+* xref - generates topic-based cross-references
