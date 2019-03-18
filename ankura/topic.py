@@ -76,7 +76,7 @@ def _sparse_topic_word(corpus, K, V, z_attr):
 def pdists(corpus, theta_attr, metric='cosine'):
     D = len(corpus.documents)
     thetas = np.array([doc.metadata[theta_attr] for doc in corpus.documents])
-    dists = spatial.distance.pdist(thetas, metric)
+    dists = spatial.distance.pdist(thetas[:D], metric)
     for ij in np.argsort(dists, axis=None):
         i, j = ij // D, ij % D
         if i == j:
