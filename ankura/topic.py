@@ -313,7 +313,7 @@ def free_classifier_dream(corpus, attr_name, labeled_docs,
 
     log_lambda = np.log(lambda_)
 
-    def _classifier(doc, get_probabilities=False):
+    def _classifier(doc, get_probabilities=False, get_log_probabilities=False):
         """The document classifier returned by free_classifier_dream
 
         By default, returns the label name for the predicted label.
@@ -333,6 +333,8 @@ def free_classifier_dream(corpus, attr_name, labeled_docs,
 
         if get_probabilities:
             return np.exp(results)
+        if get_log_probabilities:
+            return results
         return labels[np.argmax(results)]
     return _classifier
 
