@@ -77,6 +77,18 @@ def skip_extractor(delim='\n\n', encoding='utf-8', errors='strict'):
     return _extractor
 
 
+def split_extractor(delim='\n\n', encoding='utf-8', errors='strict'):
+    """Splits a whole document based on a given delim and extracts each split
+    as a Document.
+    """
+    @functools.wraps(split_extractor)
+    def _extractor(docfile):
+        data = docfile.read().decode(encoding, errors).split(delim)
+        for i, datum in enumerate(data):
+            yield Text(f'{docfile.name}_{i}', datum.strip())
+    return _extractor
+
+
 def line_extractor(delim=' ', encoding='utf-8', errors='strict'):
     """Treats each line of a file as a Text, regarding everything before the
     delimiter as the name of the Text, and everything after as the Text data.

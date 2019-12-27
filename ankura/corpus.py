@@ -1,17 +1,10 @@
 """Provides access to some standard downloadable datasets.
 
-The available datasets (and corresponding import functions) include:
-    * bible
-    * newsgroups
-    * amazon
-    * tripadvisor
-    * yelp
-    * nyt
 These imports depend on two module variables which can be mutated to change the
 download behavior of these imports. Downloaded and pickled data will be stored
 in the path given by `download_dir`, and data will be downloaded from
 `base_url`. By default, `download_dir` will be '$HOME/.ankura' while base_url
-will point at a GitHub repo designed for use with
+will point at a GitHub repo designed for use with these import functions.
 """
 import json
 import functools
@@ -94,13 +87,7 @@ def bible(version='esv', remove_stopwords=True, remove_empty=False, use_stemmer=
     tokenizer = pipeline.translate_tokenizer(
         pipeline.split_tokenizer(string.whitespace + '—'),
     )
-    if remove_stopwords:
-        tokenizer = pipeline.stopword_tokenizer(
-            tokenizer,
-            open_download('stopwords/nltk.txt'),
-        )
-    if use_stemmer:
-        tokenizer = pipeline.stemming_tokenizer(tokenizer)
+    tokenizer = _complete_tokenizer(tokenizer, remove_stopwords, use_stemmer)
 
     def _xref_labeler(name):
         return pipeline.list_labeler(
@@ -118,7 +105,7 @@ def bible(version='esv', remove_stopwords=True, remove_empty=False, use_stemmer=
             _xref_labeler('obib'),
             *[_xref_labeler('obib{}'.format(i)) for i in range(11)],
         ),
-        pipeline.keep_filterer(),
+        _get_filterer(remove_empty),
         pipeline.composite_informer(
             pipeline.title_informer('verses', 'verse'),
             pipeline.kwargs_informer(
@@ -132,14 +119,13 @@ def bible(version='esv', remove_stopwords=True, remove_empty=False, use_stemmer=
     )
 
     if remove_empty:
-        p.tokenizer = pipeline.frequency_tokenizer(p, 2)
+        p.tokenizer = pipeline.frequency_tokenizer(p, 1)
+
     bible = p.run(_path('bible_{}.pickle'.format(version),
         remove_stopwords,
         remove_empty,
         use_stemmer,
     ))
-    if remove_empty: # frequency_tokenizer may remove last word of a doc
-        bible = pipeline.select_docs(bible, lambda d: d.tokens)
 
     return bible
 
@@ -249,6 +235,9 @@ def amazon(rare_threshold=50):
 
 
 def amazon_large():
+    """Gets a Corpus containing roughly 80 million Amazon product reviews,
+    with star ratings.
+    """
     class popiter(list):
         def __iter__(self):
             while self:
@@ -369,8 +358,8 @@ def nyt(rare_threshold=150):
 
 
 def beowulf(remove_stopwords=True, use_stemmer=False):
-    """Imports the Heaney translation of Beowulf.
-    """
+    """Gets a Corpus containing the Heaney translation of Beowulf."""
+
     def poetry_extractor(docfile):
         for lineno, line in enumerate(docfile):
             yield pipeline.Text(lineno, line.decode('utf-8', 'strict').strip())
@@ -383,13 +372,7 @@ def beowulf(remove_stopwords=True, use_stemmer=False):
         return _tokenizer
 
     tokenizer = keepalpha_tokenizer(pipeline.split_tokenizer())
-    if remove_stopwords:
-        tokenizer = pipeline.stopword_tokenizer(
-            tokenizer,
-            open_download('stopwords/nltk.txt'),
-        )
-    if use_stemmer:
-        tokenizer = pipeline.stemming_tokenizer(tokenizer)
+    tokenizer = _complete_tokenizer(tokenizer, remove_stopwords, use_stemmer)
 
     p = pipeline.Pipeline(
         download_inputer('beowulf/heaney.txt'),
@@ -409,18 +392,11 @@ def beowulf(remove_stopwords=True, use_stemmer=False):
         use_stemmer,
     ))
 
+
 def artofwar(remove_stopwords=True, use_stemmer=False):
-    """Imports the sunzisaid translation of Sunzi's Art of War (孙子兵法)
+    """Gets a Corpus containing the Sunzisaid translation of Sunzi's
+    Art of War (孙子兵法).
     """
-
-    def replace_pretokenizer(base_tokenizer, find='---', repl=' '):
-        def _tokenizer(data):
-            return base_tokenizer(data.replace(find, repl))
-        return _tokenizer
-:wa
-
-    tokenizer = replace_pretokenizer(pipeline.default_tokenizer())
-
     def artofwar_extractor(docfile):
         chapter = None
         num_re = re.compile(r'\d+')
@@ -444,7 +420,13 @@ def artofwar(remove_stopwords=True, use_stemmer=False):
             verse, text = line.split('.', 1)
             yield pipeline.Text(f'{chapter}:{verse}', text.strip())
 
-    # inputer, extractor, tokenizer, labler, filterer, informer=None
+    def replace_pretokenizer(base_tokenizer, find='---', repl=' '):
+        def _tokenizer(data):
+            return base_tokenizer(data.replace(find, repl))
+        return _tokenizer
+    tokenizer = replace_pretokenizer(pipeline.default_tokenizer())
+    tokenizer = _complete_tokenizer(tokenizer, remove_stopwords, use_stemmer)
+
     p = pipeline.Pipeline(
           download_inputer('artofwar/sunzisaid.txt'),
           artofwar_extractor,
@@ -452,14 +434,61 @@ def artofwar(remove_stopwords=True, use_stemmer=False):
           pipeline.title_labeler('verse'),
           pipeline.keep_filterer(),
           pipeline.kwargs_informer(
-              name='ArtOfWar',
+              name='Art of War',
               remove_stopwords=remove_stopwords,
               use_stemmer=use_stemmer,
           ),
     )
 
-
     return p.run(_path('artofwar.pickle',
+        remove_stopwords,
+        use_stemmer,
+    ))
+
+
+def ulysses(remove_stopwords=True, use_stemmer=False, remove_empty=False):
+    """Gets a Corpus containing Ulysses by James Joyce."""
+    p = pipeline.Pipeline(
+        download_inputer(f'ulysses/ulysses.tar.gz'),
+        pipeline.targz_extractor(pipeline.split_extractor(delim='\r\n\r\n', encoding='ascii', errors='ignore')),
+        _complete_tokenizer(pipeline.default_tokenizer(), remove_stopwords, use_stemmer),
+        pipeline.title_labeler('id'),
+        pipeline.length_filterer(),
+    )
+    p.tokenizer = pipeline.frequency_tokenizer(p)
+    return p.run(_path(f'ulysses.pickle',
+        remove_stopwords,
+        use_stemmer,
+    ))
+
+
+def _complete_tokenizer(tokenizer, remove_stopwords, use_stemmer):
+    if remove_stopwords:
+        tokenizer = pipeline.stopword_tokenizer(
+            tokenizer,
+            open_download('stopwords/nltk.txt'),
+        )
+    if use_stemmer:
+        tokenizer = pipeline.stemming_tokenizer(tokenizer)
+    return tokenizer
+
+
+def _get_filterer(remove_empty):
+    if remove_empty:
+        return pipeline.length_filterer()
+    return pipeline.keep_filterer()
+
+
+def montecristo(remove_stopwords=True, use_stemmer=False):
+    """Gets a Corpus containing the text of the Count of Monte Cristo."""
+    p = pipeline.Pipeline(
+        download_inputer('montecristo/montecristo.txt'),
+        pipeline.split_extractor(),
+        _complete_tokenizer(pipeline.default_tokenizer(), remove_stopwords, use_stemmer),
+        pipeline.noop_labeler(),
+        pipeline.keep_filterer(),
+    )
+    return p.run(_path('montecristo.pickle',
         remove_stopwords,
         use_stemmer,
     ))
