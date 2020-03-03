@@ -232,18 +232,6 @@ def coherence(reference_corpus, topic_summary, epsilon=1e-2):
     return np.array(scores)
 
 
-def _lim_plogp(p):
-    if not p:
-        return 0
-    return p * np.log(p)
-
-
-def _lim_xlogy(x, y):
-    if not x and not y:
-        return 0
-    return x * np.log(y)
-
-
 # Proposed Metrics for Token Level Topic Assignment
 
 def topic_switch_percent(corpus, attr='z'):
