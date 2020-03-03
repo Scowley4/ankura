@@ -1,9 +1,11 @@
 """A collection of utility functions used throughout Ankura"""
 
-import numpy as np
-import pickle
+import errno
 import functools
 import os
+import pickle
+
+import numpy as np
 
 try:
     import numba
@@ -32,6 +34,20 @@ def logsumexp(y):
     return ymax + np.log((np.exp(y - ymax)).sum())
 
 
+@jit
+def lim_plogp(p):
+    if not p:
+        return 0
+    return p * np.log(p)
+
+
+@jit
+def lim_xlogy(x, y):
+    if not x and not y:
+        return 0
+    return x * np.log(y)
+
+
 def sample_categorical(counts):
     """Samples from a categorical distribution parameterized by unnormalized
     counts. The index of the sampled category is returned.
@@ -44,11 +60,24 @@ def sample_categorical(counts):
     raise ValueError(counts)
 
 
+def sample_categorical_np(counts):
+    return np.random.choice(len(counts), p=np.array(counts)/sum(counts))
+
 def sample_log_categorical(log_counts):
-    """Samples from a categorical distribution parameterized by unnormalized
-    counts, but this time in log space. The index of the sampled category is returned.
+    """Samples from a categorical distribution parameterized by
+    unnormalized counts, but this time in log space.
+    The index of the sampled category is returned.
     """
     return np.argmax(log_counts + np.random.gumbel(size=len(log_counts)));
+
+
+def ensure_dir(path):
+    """Ensures that a directory exists, creating it if it doesn't."""
+    try:
+        os.makedirs(path)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
 
 
 class memoize(object):
@@ -76,6 +105,7 @@ def pickle_cache(pickle_path):
             return data
         return _wrapper
     return _decorator
+
 
 def multi_pickle_cache(*paths):
     """Decorator for caching a parameterless function with multiple outputs

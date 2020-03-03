@@ -5,8 +5,9 @@ import itertools
 
 import scipy.stats
 import numpy as np
-
 from sklearn.linear_model import LogisticRegression
+
+from . import util
 
 
 class Contingency(object):
@@ -138,11 +139,11 @@ class Contingency(object):
 
         gentropy = 0
         for count in gsums.values():
-            gentropy -= _lim_plogp(count / total)
+            gentropy -= util.lim_plogp(count / total)
 
         pentropy = 0
         for count in psums.values():
-            pentropy -= _lim_plogp(count / total)
+            pentropy -= util.lim_plogp(count / total)
 
         mutual_info = 0
         for gold, row in self.table.items():
@@ -152,7 +153,7 @@ class Contingency(object):
                 pprob = psums[pred] / total
                 if gprob and pprob:
                     mutual = joint_prob / (gprob * pprob)
-                    mutual_info += _lim_xlogy(joint_prob, mutual)
+                    mutual_info += util.lim_xlogy(joint_prob, mutual)
 
         return gentropy + pentropy - 2 * mutual_info
 
