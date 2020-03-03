@@ -19,8 +19,10 @@ class Contingency(object):
         self.table = collections.defaultdict(dict)
 
     @staticmethod
-    def from_cross_reference(corpus, xrefs, xref_attr='xref', title_attr='title'):
-        """Generates a contingency table for evaluating cross references"""
+    def from_cross_reference(corpus, xrefs, xref_attr='xref',
+                             title_attr='title'):
+        """Generates a contingency table for evaluating cross references.
+        """
         contingency = Contingency()
         for doc in corpus.documents:
             gold = set(doc.metadata[xref_attr])
@@ -72,9 +74,10 @@ class Contingency(object):
     def precision(self, gold=True, pred=None):
         """Computes precision for a contingency table.
 
-        If the pred key is not given, it is assumed to be the same as the gold
-        key, which defaults to None. If the gold key is None, we return the
-        weighted average of the precisions for each of the gold keys.
+        If the pred key is not given, it is assumed to be the same as the
+        gold key, which defaults to None. If the gold key is None, we
+        return the weighted average of the precisions for each of the gold
+        keys.
         """
         if gold is None:
             precs = collections.defaultdict(int)
@@ -93,9 +96,10 @@ class Contingency(object):
     def recall(self, gold=True, pred=None):
         """Computes recall for a contingency table.
 
-        If the pred key is not given, it is assumed to be the same as the gold
-        key, which defaults to None. If the gold key is None, we return the
-        weighted average of the recall for each of the gold keys.
+        If the pred key is not given, it is assumed to be the same as the
+        gold key, which defaults to None. If the gold key is None, we
+        return the weighted average of the recall for each of the gold
+        keys.
         """
         if gold is None:
             recs = collections.defaultdict(int)
@@ -114,9 +118,10 @@ class Contingency(object):
     def fmeasure(self, gold=True, pred=None):
         """Computes f-measure (harmonic mean of precision and recall).
 
-        If the pred key is not given, it is assumed to be the same as the gold
-        key, which defaults to None. If the gold key is None, we return the
-        weighted average of the f-measure for each of the gold keys.
+        If the pred key is not given, it is assumed to be the same as the
+        gold key, which defaults to None. If the gold key is None, we
+        return the weighted average of the f-measure for each of the gold
+        keys.
         """
         if gold is None:
             fms = collections.defaultdict(int)
@@ -183,8 +188,10 @@ def anchor_accuracy(Q, anchors, test_corpus, train_corpus, label_name):
     sampling_assign(test_corpus, topics, z_attr=attr)
     sampling_assign(train_corpus, topics, z_attr=attr)
 
-    test_matrix = scipy.sparse.lil_matrix((len(test_corpus.documents), num_topics * len(test_corpus.vocabulary)))
-    train_matrix = scipy.sparse.lil_matrix((len(train_corpus.documents), num_topics * len(train_corpus.vocabulary)))
+    test_matrix = scipy.sparse.lil_matrix(
+        (len(test_corpus.documents), num_topics * len(test_corpus.vocabulary)))
+    train_matrix = scipy.sparse.lil_matrix(
+        (len(train_corpus.documents), num_topics * len(train_corpus.vocabulary)))
 
     for i, doc in enumerate(train_corpus.documents):
         for j, t in enumerate(doc.tokens):
@@ -199,16 +206,16 @@ def anchor_accuracy(Q, anchors, test_corpus, train_corpus, label_name):
     return lr.score(test_matrix, test_target)
 
 def coherence(reference_corpus, topic_summary, epsilon=1e-2):
-    """Computes topic coherence following Mimno et al., 2011 using pairwise log
-    conditional probability taken from a reference corpus.
+    """Computes topic coherence following Mimno et al., 2011 using
+    pairwise log conditional probability taken from a reference corpus.
 
     Note that this is not the same as the NPMI based coherence proposed by
-    Lau et al., 2014. Mimno et al., proposed using using the topic-modelled
-    datadata, but one can optionally use an external corpus (e.g., Wikipedia)
-    as proposed by Lau et al.
+    Lau et al., 2014. The earlier work by Mimno et al., proposed using
+    using the topic-modeled datadata, but one can optionally use an
+    external corpus (e.g., Wikipedia) as proposed by Lau et al.
 
-    The topic summary should be an array with each row giving the token types
-    of the top words of each topic.
+    The topic summary should be an array with each row giving the token
+    types (not token strings) of the top words of each topic.
     """
 
     word_set = {word for topic in topic_summary for word in topic}
