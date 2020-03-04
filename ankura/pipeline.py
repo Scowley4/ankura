@@ -6,9 +6,9 @@ A typical import includes the following pieces:
     * Tokenizer - converts a Text into TokenLoc with string tokens
     * Labeler - returns metadata from a Text name
     * Filterer - return True if a Document should be included in a Corpus
-These pieces form a Pipeline, which can then be run to import a Corpus which is
-usable throughout ankura. See `ankura.corpus` for examples of how these
-Pipeline can be used to import data.
+These pieces form a Pipeline, which can then be run to import a Corpus
+which is usable throughout ankura. See `ankura.corpus` for examples of how
+these Pipeline can be used to import data.
 """
 
 import collections
@@ -23,11 +23,12 @@ import string
 import tarfile
 import time
 
+import nltk
 import bs4
 import scipy.sparse
 import numpy as np
 
-# POD types used throughout the pipeline process
+# POD types used throughout the pipeline process and ankura in general.
 
 Text = collections.namedtuple('Text', 'name data')
 TokenLoc = collections.namedtuple('TokenLoc', 'token loc')
@@ -76,6 +77,18 @@ def skip_extractor(delim='\n\n', encoding='utf-8', errors='strict'):
         data = docfile.read().decode(encoding, errors)
         _, data = data.split(delim, 1)
         yield Text(docfile.name, data)
+    return _extractor
+
+
+def split_extractor(delim='\n\n', encoding='utf-8', errors='strict'):
+    """Splits a whole document based on a given delim and extracts each split
+    as a Document.
+    """
+    @functools.wraps(split_extractor)
+    def _extractor(docfile):
+        data = docfile.read().decode(encoding, errors).split(delim)
+        for i, datum in enumerate(data):
+            yield Text(f'{docfile.name}_{i}', datum.strip())
     return _extractor
 
 
@@ -192,6 +205,13 @@ def default_tokenizer():
     punctuation. Empty tokens are removed.
     """
     return translate_tokenizer(split_tokenizer())
+
+
+def stemming_tokenizer(base_tokenizer):
+    stemmer = nltk.stem.PorterStemmer()
+    def _tokenizer(data):
+        return [TokenLoc(stemmer.stem(t.token), t.loc) for t in base_tokenizer(data)]
+    return _tokenizer
 
 
 def regex_tokenizer(base_tokenizer, pattern, repl):
@@ -379,8 +399,22 @@ def list_labeler(data, attr='label', delim='\t', sep=','):
     list of string retrieved by spliting on a separator.
     """
     stream = (line.rstrip(os.linesep).split(delim, 1) for line in data)
-    stream = ((key, value.split(sep)) for key, value in stream)
+    stream = ((key, value.split(sep) if value else []) for key, value in stream)
     return stream_labeler(stream, attr)
+
+
+def transform_labeler(base_labeler, transform_fn):
+    """Returns a labeler which transforms the labels of another labeler. The
+    transform_fn should be a function which takes in a value (not the key)
+    output by another labeler and returns the transformed value.
+    """
+    @functools.wraps(transform_labeler)
+    def _labeler(name):
+        labels = base_labeler(name)
+        for key, value in labels.items():
+            labels[key] = transform_fn(value)
+        return labels
+    return _labeler
 
 
 def composite_labeler(*labelers):
@@ -455,6 +489,13 @@ def kwargs_informer(**kwargs):
     @functools.wraps(kwargs_informer)
     def _informer(corpus):
         return kwargs
+    return _informer
+
+
+def title_informer(corpus_attr, title_attr):
+    @functools.wraps(title_informer)
+    def _informer(corpus):
+        return {corpus_attr: {doc.metadata[title_attr]: d for d, doc in enumerate(corpus.documents)}}
     return _informer
 
 
@@ -623,7 +664,9 @@ def build_docwords(corpus, V=None):
     return docwords.tocsc()
 
 def remove_nonexistent_train_words(train, test):
-    """Removes words from corpus vocabulary that don't actually appear in the train corpus.
+    """Removes words from corpus vocabulary that do not appear in the
+    train corpus.
+
     Will not work for corpora that are read in through a DocStream.
     """
 
@@ -654,7 +697,24 @@ def remove_nonexistent_train_words(train, test):
 
     return train, test
 
-def train_test_split(corpus, num_train=None, num_test=None, random_seed=None, remove_testonly_words=True, **kwargs):
+def train_test_split(corpus, num_train=None, num_test=None,
+                     random_seed=None, remove_testonly_words=True,
+                     **kwargs):
+    """Creates train and test splits of a Corpus.
+
+    By default, the split an 80/20 test/train split of the entire Corpus.
+    If num_train or num_test are given, then that number of documents will
+    be used for the train or test split respectively, with the remaining
+    documents used for the other split. Alternatively, both num_train and
+    num_test can be specified to use only a portion of a Corpus.
+
+    Normally two Corpus objects are returned with the same vocabulary and
+    metadata as the original Corpus, but containing just the documents of
+    the train/test split. Optionally, the keyword argument return_ids can
+    be given, indicating that the document ids into the original Corpus
+    object should also be given. In this case, train and test are given as
+    tuples containing the ids and the split Corpus.
+    """
 
     if not random_seed:
         random_seed = time.time()
@@ -698,3 +758,24 @@ def train_test_split(corpus, num_train=None, num_test=None, random_seed=None, re
     if kwargs.get('return_ids'):
         return (train_ids, train), (test_ids, test)
     return train, test
+
+
+def sample_corpus(corpus, n, return_ids=False):
+    """Creates a subset of a corpus.
+    """
+    doc_ids = np.random.choice(len(corpus.documents), size=n, replace=False)
+    subcorpus = Corpus([corpus.documents[d] for d in doc_ids], corpus.vocabulary, corpus.metadata)
+
+    if return_ids:
+        return doc_ids, subcorpus
+    return subcorpus
+
+
+def select_docs(corpus, select_fn):
+    """Creates a new Corpus with only a selection of documents.
+
+    The select_fn is a function which takes a document as input and returns
+    True if the document should be included in the selection.
+    """
+    keep = [doc for doc in corpus.documents if select_fn(doc)]
+    return Corpus(keep, corpus.vocabulary, corpus.metadata)
