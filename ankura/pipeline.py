@@ -762,6 +762,7 @@ def train_test_split(corpus, num_train=None, num_test=None,
     tuples containing the ids and the split Corpus.
     """
 
+    # FIXME This does not feel right
     if not random_seed:
         random_seed = time.time()
     np.random.seed(int(random_seed))
@@ -774,11 +775,19 @@ def train_test_split(corpus, num_train=None, num_test=None,
     elif not num_test:
         num_test = len(corpus.documents) - num_train
 
+    # FIXME A different check should be made
     try:
         doc_ids = np.random.permutation(len(corpus.documents))
-        train_ids, test_ids = doc_ids[:num_train], doc_ids[num_train: num_train+num_test]
-        train = Corpus([corpus.documents[d] for d in train_ids], corpus.vocabulary, corpus.metadata)
-        test = Corpus([corpus.documents[d] for d in test_ids], corpus.vocabulary, corpus.metadata)
+
+        train_ids = doc_ids[:num_train]
+        test_ids =  doc_ids[num_train: num_train+num_test]
+
+        # FIXME Both `vocabulary` and `metadata` are mutible.
+        # Do we want both train and test to mutate these objects?
+        train = Corpus([corpus.documents[d] for d in train_ids],
+                       corpus.vocabulary, corpus.metadata)
+        test = Corpus([corpus.documents[d] for d in test_ids],
+                       corpus.vocabulary, corpus.metadata)
         if remove_testonly_words:
             train, test = remove_nonexistent_train_words(train, test)
     except TypeError: # corpus doesn't support random indexing
@@ -798,6 +807,8 @@ def train_test_split(corpus, num_train=None, num_test=None,
                 doc_ids[replace_index] = i
 
         train_ids, test_ids = doc_ids[:num_train], doc_ids[num_train:]
+        # FIXME Both `vocabulary` and `metadata` are mutible.
+        # Do we want both train and test to mutate these objects?
         train = Corpus(sample[:num_train], corpus.vocabulary, corpus.metadata)
         test = Corpus(sample[num_train:], corpus.vocabulary, corpus.metadata)
 
