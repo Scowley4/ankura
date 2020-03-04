@@ -608,6 +608,52 @@ class DocumentStream(object):
     def __len__(self):
         return self._size
 
+# TODO
+# In combining Ankura with Jefflund's repo, I was not clear what to do with
+# these two different Stream objects.
+# scowley4
+# Mar 4 2020
+class JeffDocumentStream(object):
+    """A file-backed list of documents for Corpus that are too big for RAM."""
+
+    def __init__(self, filename):
+        self._path = filename
+        self._offsets = [0]
+        self._file = open(self._path, 'wb')
+
+    def append(self, doc):
+        if not self._file or not self._file.writable():
+            self._file = open(self._path, 'ab')
+
+        obj = pickle.dumps(doc)
+        self._offsets.append(self._offsets[-1] + len(obj))
+        self._file.write(obj)
+
+    def __getitem__(self, i):
+        if not self._file or not self._file.readable():
+            self._file = open(self._path, 'rb')
+
+        self._file.seek(self._offsets[i])
+        return pickle.load(self._file)
+
+    def __iter__(self):
+        if self._file:
+            self._file.flush()
+
+        with open(self._path, 'rb') as f:
+            for _ in range(len(self)):
+                yield pickle.load(f)
+
+    def __len__(self):
+        return len(self._offsets) - 1
+
+    def __getstate__(self):
+        return (self._path, self._offsets)
+
+    def __setstate__(self, state):
+        self._path, self._offsets = state
+        self._file = None
+
 
 class Pipeline(object):
     """Pipeline describes the process of importing a Corpus"""
