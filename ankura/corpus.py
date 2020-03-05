@@ -202,7 +202,7 @@ def newsgroups(rare_threshold=100, common_threshold=2000):
     ))
 
 
-def amazon():
+def amazon(rare_threshold=50, common_threshold=None):
     """Gets a Corpus containing roughly 40,000 Amazon product reviews, with
     star ratings.
     """
@@ -231,9 +231,17 @@ def amazon():
             ),
         ),
         pipeline.length_filterer(),
+        pipeline.kwargs_informer(name='amazon'),
     )
-    p.tokenizer = pipeline.frequency_tokenizer(p, 50)
-    return p.run(_path('amazon.pickle'))
+    if rare_threshold or common_threshold:
+        p.tokenizer = pipeline.frequency_tokenizer(p,
+            rare_threshold,
+            common_threshold,
+        )
+    return p.run(_path('amazon.pickle',
+        rare_threshold,
+        common_threshold,
+    ))
 
 
 def amazon_medium():
