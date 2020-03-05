@@ -133,9 +133,16 @@ def bible():
     return p.run(_path('bible.pickle'))
 
 
-def newsgroups():
+
+def newsgroups(rare_threshold=100, common_threshold=2000):
     """Gets a Corpus containing roughly 20,000 usenet postings from 20
     different newsgroups in the early 1990's.
+
+    The rare_threshold (default: 100) is the minimum number of documents a word
+    must appear in to be retained.
+    The common_threshold (default: 2000) is the maximum number of documents a
+    word can appear in to be retained.
+    Both options can be set to None to disable filtering.
     """
     coarse_mapping = {
         'comp.graphics': 'comp',
@@ -176,12 +183,23 @@ def newsgroups():
         pipeline.composite_labeler(
             pipeline.title_labeler('id'),
             pipeline.dir_labeler('newsgroup'),
-            lambda n: {'coarse_newsgroup': coarse_mapping[os.path.dirname(n)]},
+            pipeline.transform_labeler(
+                pipeline.dir_labeler('coarse_newsgroup'),
+                coarse_mapping.get,
+            ),
         ),
         pipeline.length_filterer(),
+        pipeline.kwargs_informer(name='newsgroups'),
     )
-    p.tokenizer = pipeline.frequency_tokenizer(p, 100, 2000)
-    return p.run(_path('newsgroups.pickle'))
+    if rare_threshold or common_threshold:
+        p.tokenizer = pipeline.frequency_tokenizer(p,
+            rare_threshold,
+            common_threshold,
+        )
+    return p.run(_path('newsgroups.pickle',
+        rare_threshold,
+        common_threshold,
+    ))
 
 
 def amazon():
