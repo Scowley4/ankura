@@ -7,23 +7,32 @@ The available datasets (and corresponding import functions) include:
 These imports depend on two module variables which can be mutated to change the
 download behavior of these imports. Downloaded and pickled data will be stored
 in the path given by `download_dir`, and data will be downloaded from
-`base_url`. By default, `download_dir` will be '$HOME/.ankura' while base_urlwill point at a GitHub repo designed for use with
+`base_url`. By default, `download_dir` will be '$HOME/.ankura' while base_url
+will point at a GitHub repo designed for use with these import functions.
 """
 
+import json
 import functools
 import itertools
 import os
+import string
 import urllib.request
+import re
 
 from . import pipeline
 import posixpath
 
 download_dir = os.path.join(os.getenv('HOME'), '.ankura')
 
-def _path(name):
+def _path(name, *opts):
+    if opts:
+        name, dot, ext = name.partition('.')
+        opts =  '_'.join('-' if opt is None else str(int(opt)) for opt in opts)
+        name = '{}_{}{}{}'.format(name, opts, dot, ext)
     return os.path.join(download_dir, name)
 
 
+# TODO MERGE DATA DIRECTORIES
 base_url = 'https://github.com/byu-aml-lab/data/raw/data2'
 
 def _url(name):
@@ -78,8 +87,12 @@ def open_download(name, mode='r'):
 
 def download_inputer(*names):
     """Generates file objects for the given names, downloading the data to
-    download_dir from base_url if needed. Using the default base_url the
-    available names are:
+    download_dir from base_url if needed. The expected names reflect the
+    filenames in the default base_url and are used throughout this module. In
+    otherwords, if base_url is changed, it may break the import functions in
+    the module which rely on download_inputer.
+
+    Using the default base_url the available names are:
         * bible/bible.txt
         * bible/xref.txt
         * newsgroups/newsgroups.tar.gz
@@ -91,6 +104,149 @@ def download_inputer(*names):
         for name in names:
             yield open_download(name, mode='rb')
     return _inputer
+
+
+def bible():
+    """Gets a Corpus containing the King James version of the Bible with over
+    250,000 cross references.
+    """
+    p= pipeline.Pipeline(
+        download_inputer('bible/bible.txt'),
+        pipeline.line_extractor(),
+        pipeline.stopword_tokenizer(
+            pipeline.default_tokenizer(),
+            itertools.chain(
+                open_download('stopwords/english.txt'),
+                open_download('stopwords/jacobean.txt'),
+            )
+        ),
+        pipeline.composite_labeler(
+            pipeline.title_labeler('verse'),
+            pipeline.list_labeler(
+                open_download('bible/xref.txt'),
+                'xref',
+            ),
+        ),
+        pipeline.keep_filterer(),
+    )
+    p.tokenizer = pipeline.frequency_tokenizer(p, 2)
+    return p.run(_path('bible.pickle'))
+
+
+def newsgroups():
+    """Gets a Corpus containing roughly 20,000 usenet postings from 20
+    different newsgroups in the early 1990's.
+    """
+    coarse_mapping = {
+        'comp.graphics': 'comp',
+        'comp.os.ms-windows.misc': 'comp',
+        'comp.sys.ibm.pc.hardware': 'comp',
+        'comp.sys.mac.hardware': 'comp',
+        'comp.windows.x': 'comp',
+        'rec.autos': 'rec',
+        'rec.motorcycles': 'rec',
+        'rec.sport.baseball': 'rec',
+        'rec.sport.hockey': 'rec',
+        'sci.crypt': 'sci',
+        'sci.electronics': 'sci',
+        'sci.med': 'sci',
+        'sci.space': 'sci',
+        'misc.forsale': 'misc',
+        'talk.politics.misc': 'politics',
+        'talk.politics.guns': 'politics',
+        'talk.politics.mideast': 'politics',
+        'talk.religion.misc' : 'religion',
+        'alt.atheism' : 'religion',
+        'soc.religion.christian' : 'religion',
+    }
+
+    p = pipeline.Pipeline(
+        download_inputer('newsgroups/newsgroups.tar.gz'),
+        pipeline.targz_extractor(
+            pipeline.skip_extractor(errors='replace'),
+        ),
+        pipeline.remove_tokenizer(
+            pipeline.stopword_tokenizer(
+                pipeline.default_tokenizer(),
+                itertools.chain(open_download('stopwords/english.txt'),
+                                open_download('stopwords/newsgroups.txt'))
+            ),
+            r'^(.{0,2}|.{15,})$', # remove any token t with len(t)<=2 or len(t)>=15
+        ),
+        pipeline.composite_labeler(
+            pipeline.title_labeler('id'),
+            pipeline.dir_labeler('newsgroup'),
+            lambda n: {'coarse_newsgroup': coarse_mapping[os.path.dirname(n)]},
+        ),
+        pipeline.length_filterer(),
+    )
+    p.tokenizer = pipeline.frequency_tokenizer(p, 100, 2000)
+    return p.run(_path('newsgroups.pickle'))
+
+
+def amazon():
+    """Gets a Corpus containing roughly 40,000 Amazon product reviews, with
+    star ratings.
+    """
+    def binary_labeler(data, threshold, attr='label', delim='\t'):
+        stream = (line.rstrip(os.linesep).split(delim, 1) for line in data)
+        stream = ((key, float(value) >= threshold) for key, value in stream)
+        return pipeline.stream_labeler(stream, attr)
+
+    p = pipeline.Pipeline(
+        download_inputer('amazon/amazon.txt'),
+        pipeline.line_extractor('\t'),
+        pipeline.stopword_tokenizer(
+            pipeline.default_tokenizer(),
+            open_download('stopwords/english.txt'),
+        ),
+        pipeline.composite_labeler(
+            pipeline.title_labeler('id'),
+            pipeline.float_labeler(
+                open_download('amazon/amazon.stars'),
+                'rating',
+            ),
+            _binary_string_labeler(
+                open_download('amazon/amazon.stars'),
+                5,
+                'binary_rating',
+            ),
+        ),
+        pipeline.length_filterer(),
+    )
+    p.tokenizer = pipeline.frequency_tokenizer(p, 50)
+    return p.run(_path('amazon.pickle'))
+
+
+def amazon_medium():
+    """Gets a corpus containing 100,000 Amazon product reviews, with star ratings.
+    """
+    label_stream = BufferedStream()
+
+    def label_extractor(docfile, value_key='reviewText', label_key='overall'):
+
+        import json
+
+        for i, line in enumerate(docfile):
+            line = json.loads(line.decode('utf-8'))
+            label_stream.append((str(i), line[label_key]))
+
+            yield pipeline.Text(str(i), line[value_key])
+
+    p = pipeline.Pipeline(
+        download_inputer('amazon_medium/amazon_medium.json.gz'),
+        pipeline.gzip_extractor(label_extractor),
+        pipeline.stopword_tokenizer(
+            pipeline.default_tokenizer(),
+            open_download('stopwords/english.txt'),
+        ),
+        pipeline.stream_labeler(label_stream),
+        pipeline.length_filterer(),
+    )
+
+    p.tokenizer = pipeline.frequency_tokenizer(p, 100, 2000)
+    return p.run(_path('amazon_medium.pickle'))
+
 
 def tripadvisor():
     """Gets a corpus containing hotel reviews on trip advisor with ~240,000 documents"""
@@ -181,32 +337,6 @@ def yelp():
     return p.run(_path('yelp.pickle'))
 
 
-def bible():
-    """Gets a Corpus containing the King James version of the Bible with over
-    250,000 cross references.
-    """
-    p= pipeline.Pipeline(
-        download_inputer('bible/bible.txt'),
-        pipeline.line_extractor(),
-        pipeline.stopword_tokenizer(
-            pipeline.default_tokenizer(),
-            itertools.chain(
-                open_download('stopwords/english.txt'),
-                open_download('stopwords/jacobean.txt'),
-            )
-        ),
-        pipeline.composite_labeler(
-            pipeline.title_labeler('verse'),
-            pipeline.list_labeler(
-                open_download('bible/xref.txt'),
-                'xref',
-            ),
-        ),
-        pipeline.keep_filterer(),
-    )
-    p.tokenizer = pipeline.frequency_tokenizer(p, 2)
-    return p.run(_path('bible.pickle'))
-
 def toy():
     p = pipeline.Pipeline(
         download_inputer('toy/toy.tar.gz'),
@@ -222,118 +352,6 @@ def toy():
     )
     p.tokenizer = pipeline.frequency_tokenizer(p)
     return p.run(_path('toy.pickle'))
-
-def newsgroups():
-    """Gets a Corpus containing roughly 20,000 usenet postings from 20
-    different newsgroups in the early 1990's.
-    """
-    coarse_mapping = {
-        'comp.graphics': 'comp',
-        'comp.os.ms-windows.misc': 'comp',
-        'comp.sys.ibm.pc.hardware': 'comp',
-        'comp.sys.mac.hardware': 'comp',
-        'comp.windows.x': 'comp',
-        'rec.autos': 'rec',
-        'rec.motorcycles': 'rec',
-        'rec.sport.baseball': 'rec',
-        'rec.sport.hockey': 'rec',
-        'sci.crypt': 'sci',
-        'sci.electronics': 'sci',
-        'sci.med': 'sci',
-        'sci.space': 'sci',
-        'misc.forsale': 'misc',
-        'talk.politics.misc': 'politics',
-        'talk.politics.guns': 'politics',
-        'talk.politics.mideast': 'politics',
-        'talk.religion.misc' : 'religion',
-        'alt.atheism' : 'religion',
-        'soc.religion.christian' : 'religion',
-    }
-
-    p = pipeline.Pipeline(
-        download_inputer('newsgroups/newsgroups.tar.gz'),
-        pipeline.targz_extractor(
-            pipeline.skip_extractor(errors='replace'),
-        ),
-        pipeline.remove_tokenizer(
-            pipeline.stopword_tokenizer(
-                pipeline.default_tokenizer(),
-                itertools.chain(open_download('stopwords/english.txt'),
-                                open_download('stopwords/newsgroups.txt'))
-            ),
-            r'^(.{0,2}|.{15,})$', # remove any token t with len(t)<=2 or len(t)>=15
-        ),
-        pipeline.composite_labeler(
-            pipeline.title_labeler('id'),
-            pipeline.dir_labeler('newsgroup'),
-            lambda n: {'coarse_newsgroup': coarse_mapping[os.path.dirname(n)]},
-        ),
-        pipeline.length_filterer(),
-    )
-    p.tokenizer = pipeline.frequency_tokenizer(p, 100, 2000)
-    return p.run(_path('newsgroups.pickle'))
-
-def amazon_medium():
-    """Gets a corpus containing 100,000 Amazon product reviews, with star ratings.
-    """
-    label_stream = BufferedStream()
-
-    def label_extractor(docfile, value_key='reviewText', label_key='overall'):
-
-        import json
-
-        for i, line in enumerate(docfile):
-            line = json.loads(line.decode('utf-8'))
-            label_stream.append((str(i), line[label_key]))
-
-            yield pipeline.Text(str(i), line[value_key])
-
-    p = pipeline.Pipeline(
-        download_inputer('amazon_medium/amazon_medium.json.gz'),
-        pipeline.gzip_extractor(label_extractor),
-        pipeline.stopword_tokenizer(
-            pipeline.default_tokenizer(),
-            open_download('stopwords/english.txt'),
-        ),
-        pipeline.stream_labeler(label_stream),
-        pipeline.length_filterer(),
-    )
-
-    p.tokenizer = pipeline.frequency_tokenizer(p, 100, 2000)
-    return p.run(_path('amazon_medium.pickle'))
-
-def amazon():
-    """Gets a Corpus containing roughly 40,000 Amazon product reviews, with
-    star ratings.
-    """
-    def binary_labeler(data, threshold, attr='label', delim='\t'):
-        stream = (line.rstrip(os.linesep).split(delim, 1) for line in data)
-        stream = ((key, float(value) >= threshold) for key, value in stream)
-        return pipeline.stream_labeler(stream, attr)
-
-    p = pipeline.Pipeline(
-        download_inputer('amazon/amazon.txt'),
-        pipeline.line_extractor('\t'),
-        pipeline.stopword_tokenizer(
-            pipeline.default_tokenizer(),
-            open_download('stopwords/english.txt'),
-        ),
-        pipeline.composite_labeler(
-            pipeline.title_labeler('id'),
-            pipeline.float_labeler(
-                open_download('amazon/amazon.stars'),
-                'rating',
-            ),
-            _binary_string_labeler(
-                open_download('amazon/amazon.stars'),
-                5,
-                'binary_rating',
-            ),
-        ),
-        pipeline.length_filterer(),
-    )
-    p.tokenizer = pipeline.frequency_tokenizer(p, 50)
-    return p.run(_path('amazon.pickle'))
 
 def congress():
     """Corpus on congress talking about different issues/bills."""
