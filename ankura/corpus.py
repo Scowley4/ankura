@@ -274,8 +274,10 @@ def amazon_medium():
     return p.run(_path('amazon_medium.pickle'))
 
 
-def tripadvisor():
-    """Gets a corpus containing hotel reviews on trip advisor with ~240,000 documents"""
+def tripadvisor(rare_threshold=150, common_threshold=None):
+    """Gets a corpus containing hotel reviews on trip advisor with
+    ~240,000 documents with ratings.
+    """
     # These words should be removed, as they don't end up cooccuring with other
     # words
     extra_stopwords = ['zentral', 'jederzeit', 'gerne', 'gutes', 'preis',
@@ -320,11 +322,18 @@ def tripadvisor():
         ),
         pipeline.length_filterer(30),
     )
-    p.tokenizer = pipeline.frequency_tokenizer(p, 150)
-    return p.run(_path('tripadvisor.pickle'))
+    if rare_threshold or common_threshold:
+        p.tokenizer = pipeline.frequency_tokenizer(p,
+            rare_threshold,
+            common_threshold,
+        )
+    return p.run(_path('tripadvisor.pickle',
+        rare_threshold,
+        common_threshold,
+    ))
 
 
-def yelp():
+def yelp(rare_threshold=50, common_threshold=None):
     """ Gets a corpus containing Yelp reviews with 25431 documents """
 
     base_tokenzer = pipeline.default_tokenizer()
@@ -358,9 +367,17 @@ def yelp():
             ),
         ),
         pipeline.length_filterer(30),
+        pipeline.kwargs_informer(name='yelp'),
     )
-    p.tokenizer = pipeline.frequency_tokenizer(p, 50)
-    return p.run(_path('yelp.pickle'))
+    if rare_threshold or common_threshold:
+        p.tokenizer = pipeline.frequency_tokenizer(p,
+            rare_threshold,
+            common_threshold,
+        )
+    return p.run(_path('yelp.pickle',
+        rare_threshold,
+        common_threshold,
+    ))
 
 
 def toy():
