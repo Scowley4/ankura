@@ -297,8 +297,12 @@ def tandem_anchors(anchors, Q, corpus=None, epsilon=1e-10):
     is a multiword anchor which is constructed by taking the harmonic mean of
     the indexed rows. To avoid zero weights, an epsilon (default: 1e-10) is
     added to each anchor vector.
+
+    Optionally, a Corpus object can be given, which means that the anchors were
+    given as a list of list of token strings. In this case, the Corpus
+    vocabulary is used to convert the given anchors to indicies. Any token
+    which is not in the Corpus vocabulary is silently ignored.
     """
-    # TODO document why the corpus is here...
     if corpus:
         anchor_indices = []
         for anchor in anchors:
@@ -319,8 +323,21 @@ def tandem_anchors(anchors, Q, corpus=None, epsilon=1e-10):
             basis[i] = scipy.stats.hmean(Q[anchor, :] + epsilon, axis=0)
     return basis
 
+
+def doc_anchors(corpus, Q, k, epsilon=1e-10):
+    """Creates tandem anchors using entire documents as the anchors.
+
+    The anchors are created by selecting k random documents, and using
+    the tokens of the document as the words in a multiword anchor.
+    """
+    docs = np.random.choice(len(corpus.documents), size=k, replace=False)
+    anchors = [[t.token for t in corpus.documents[d].tokens] for d in docs]
+    return tandem_anchors(anchors, Q)
+
+
 @util.jit
 def _exponentiated_gradient(Y, X, XX, epsilon):
+    """Helper for recover_topics. Exposed only for multiprocessing purposes."""
     _C1 = 1e-4
     _C2 = .75
 
