@@ -1,7 +1,8 @@
+bs4
+colorama
+gensim
+nltk
 numpy
 scipy
 scikit-learn
-bs4
-gensim
 tqdm
-colorama
