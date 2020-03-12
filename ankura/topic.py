@@ -14,16 +14,27 @@ from math import log, exp
 from . import pipeline, util
 
 
-def topic_summary(topics, corpus=None, n=10):
+def topic_summary(topics, corpus=None, n=10, stopwords=None):
     """Gets the top n tokens per topic.
 
     If a vocabulary is provided, the tokens are returned instead of the types.
     """
+    if stopwords:
+        if not corpus:
+            raise ValueError('Corpus cannot be None if stopwords is given')
+        stopword_set = set(stopwords)
+        include = lambda v: corpus.vocabulary[v] not in stopword_set
+    else:
+        include = lambda v: True
+
     summary = []
     for k in range(topics.shape[1]):
         index = []
-        for word in np.argsort(topics[:, k])[-n:][::-1]:
-            index.append(word)
+        for word in np.argsort(topics[:, k])[::-1]:
+            if include(word):
+                index.append(word)
+            if len(index) == n:
+                break
         summary.append(index)
 
     if corpus:
