@@ -1,16 +1,12 @@
 """Functions for using and displaying topics"""
 
-import functools
 import sys
 import collections
 
 import numpy as np
-import scipy.spatial
-import sklearn.decomposition
-import gensim
-import tqdm
+from scipy import spatial, sparse
+import sklearn.naive_bayes
 
-from math import log, exp
 from . import pipeline, util, assign
 
 
@@ -65,6 +61,52 @@ def gensim_assign(corpus, topics, theta_attr=None, z_attr=None, needs_assign=Non
         needs_assign=needs_assign)
 
 
+def highlight(doc, z_attr, highlighter=lambda w, z: '{}:{}'.format(w, z)):
+    """Gets the text of a Document with the topic assignments highlighted"""
+    chunks = []
+    curr = 0
+
+    for token, topic in zip(doc.tokens, doc.metadata[z_attr]):
+        start, end = token.loc
+        chunks.append(doc.text[curr:start])
+        chunks.append(highlighter(doc.text[start:end], topic))
+        curr = end
+    chunks.append(doc.text[curr:])
+
+    return ''.join(chunks)
+
+def jeff_classifier(train, topics, label_attr='label', z_attr='z', alpha=.01):
+    K = topics.shape[1]
+    V = len(train.vocabulary)
+
+    train_data = _sparse_topic_word(train, K, V, z_attr)
+    train_labels = [doc.metadata[label_attr] for doc in train.documents]
+    model = sklearn.naive_bayes.MultinomialNB(alpha)
+    model.fit(train_data, train_labels)
+
+    return lambda test: model.predict(_sparse_topic_word(test, K, V, z_attr)).tolist()
+
+
+def _sparse_topic_word(corpus, K, V, z_attr):
+    D = len(corpus.documents)
+    data = sparse.lil_matrix((D, K*V))
+    for d, doc in enumerate(corpus.documents):
+        for w, z in zip(doc.tokens, doc.metadata[z_attr]):
+            data[d, w.token + z*V] += 1
+    return data
+
+
+def pdists(corpus, theta_attr, metric='cosine'):
+    D = len(corpus.documents)
+    thetas = np.array([doc.metadata[theta_attr] for doc in corpus.documents])
+    dists = spatial.distance.pdist(thetas[:D], metric)
+    for ij in np.argsort(dists, axis=None):
+        i, j = ij // D, ij % D
+        if i == j:
+            continue
+        yield i, j
+
+
 def cross_reference(corpus, attr, doc=None, n=sys.maxsize, threshold=1):
     """Finds the nearest documents by topic similarity.
 
@@ -85,7 +127,7 @@ def cross_reference(corpus, attr, doc=None, n=sys.maxsize, threshold=1):
     """
     def _xrefs(doc):
         doc_theta = doc.metadata[attr]
-        dists = [scipy.spatial.distance.cosine(doc_theta, d.metadata[attr])
+        dists = [spatial.distance.cosine(doc_theta, d.metadata[attr])
                  if doc is not d else float('nan')
                  for d in corpus.documents]
         dists = np.array(dists)
