@@ -128,3 +128,18 @@ def multi_pickle_cache(*paths):
             return data
         return _wrapper
     return _decorator
+
+
+def func_moved(new_name):
+    """Decorator for wrapping moved or renamed functions."""
+    warned = False
+    def _decorator(f):
+        def _wrapper(*args, **kwargs):
+            nonlocal warned
+            if not warned:
+                print(f'**WARNING** {f.__name__} moved.\n'
+                      f'    Please use {new_name}')
+                warned = True
+            return f(*args, **kwargs)
+        return _wrapper
+    return _decorator
