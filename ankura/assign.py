@@ -19,6 +19,37 @@ try:
 except:
     import util
 
+
+def sklearn_variational(corpus, topics, theta_attr='theta', docwords_attr=None):
+    """Predicts topic assignments for a corpus.
+
+    Topic inference is done using online variational inference with Latent
+    Dirichlet Allocation and fixed topics following Hoffman et al., 2010. Each
+    document is given a metadata value named by theta_attr corresponding to the
+    its predicted topic distribution.
+
+    If docwords_attr is given, then the corpus metadata with that name is
+    assumed to contain a pre-computed sparse docwords matrix. Otherwise, this
+    docwords matrix will be recomputed.
+    """
+    V, K = topics.shape
+    if docwords_attr:
+        docwords = corpus.metadata[docwords_attr]
+        if docwords.shape[1] != V:
+            raise ValueError('Mismatch between topics and docwords shape')
+    else:
+        docwords = pipeline.build_docwords(corpus, V)
+
+    lda = sklearn.decomposition.LatentDirichletAllocation(K)
+    lda.components_ = topics.T
+    lda._check_params()
+    lda._init_latent_vars(V)
+    theta = lda.transform(docwords)
+
+    for doc, theta_d in zip(corpus.documents, theta):
+        doc.metadata[theta_attr] = theta_d
+
+
 def gensim_variational(corpus, topics, theta_attr=None, z_attr=None, needs_assign=None):
     """Assigns topics using variational inference through gensim."""
     if not theta_attr and not z_attr:
