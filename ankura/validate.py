@@ -240,7 +240,6 @@ def coherence(reference_corpus, topic_summary, epsilon=1e-2):
 
 # Significance measures proposed by AlSumait et al, 2009
 
-
 def significance_wuni(topic):
     """Measures the distance of a topic from the uniform word distribution."""
     V = len(topic)

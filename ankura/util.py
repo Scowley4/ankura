@@ -11,6 +11,9 @@ try:
     import numba
     jit = functools.partial(numba.jit, nopython=True)
 except ImportError:
+    import warnings
+    warnings.warn('numba not installed. '
+                  'Consider installing it to speed up topic recovery')
     jit = lambda x:x
 
 
