@@ -120,7 +120,7 @@ def sampling(corpus, topics, theta_attr=None, z_attr=None, alpha=.01, num_iters=
         for d, (doc, z_d) in enumerate(zip(corpus.documents, z)):
             for n, w_dn in enumerate(doc.tokens):
                 c[d, z_d[n]] -= 1
-                cond = [alpha + c[d, t] * topics[w_dn.token, t] for t in range(T)]
+                cond = (alpha + c[d, :]) * topics[w_dn.token, :]
                 z_d[n] = util.sample_categorical(cond)
                 c[d, z_d[n]] += 1
 
